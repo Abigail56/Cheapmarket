@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="referrer" content="strict-origin-when-cross-origin">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#1f8a4c">
+  <title>Cheapmarketdeal Rider</title>
+  <link rel="manifest" href="/rider/manifest.webmanifest">
+  <link rel="icon" href="/rider/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="/rider/icon.svg">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+        integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+  <link rel="stylesheet" href="/static/common.css">
+</head>
+<body>
+  <header class="bar">
+    <h1><span class="brand">Cheapmarketdeal</span> Rider</h1>
+    <span id="live" class="status-dot" title="Live connection"></span>
+    <span id="sound"></span>
+    <button id="logout" class="small secondary hidden" type="button">Log out</button>
+  </header>
+
+  <main>
+    <section id="login" class="card hidden">
+      <h2>Rider sign in</h2>
+      <p class="muted">Use the email and password your admin gave you.</p>
+      <form id="login-form" class="stack">
+        <div><label for="email">Email</label><input id="email" type="email" autocomplete="username" required></div>
+        <div><label for="password">Password</label><input id="password" type="password" autocomplete="current-password" required></div>
+        <button type="submit">Sign in</button>
+      </form>
+      <div class="or hidden" id="or-login">or</div>
+      <div id="google-login" class="google-btn hidden"></div>
+      <p class="muted" style="margin-top:16px">New rider? <a href="#" id="show-apply">Apply to ride with us</a></p>
+    </section>
+
+    <section id="apply" class="card hidden">
+      <h2>Apply to ride with us</h2>
+      <p class="muted">Fill this in and we'll review it. You'll get an SMS when you're approved, then you can sign in.</p>
+      <div id="google-apply" class="google-btn hidden"></div>
+      <p id="google-apply-done" class="banner cash hidden"></p>
+      <form id="apply-form" class="stack">
+        <div><label for="a-name">Full name</label><input id="a-name" autocomplete="name" minlength="2" maxlength="150" required></div>
+        <div><label for="a-phone">Phone number</label><input id="a-phone" type="tel" autocomplete="tel" placeholder="0803 123 4567" required></div>
+        <div id="email-fields">
+          <div><label for="a-email">Email</label><input id="a-email" type="email" autocomplete="email" required></div>
+          <div><label for="a-password">Choose a password (8+ characters)</label><input id="a-password" type="password" autocomplete="new-password" minlength="8" maxlength="128" required></div>
+        </div>
+        <div><label for="a-vehicle">What do you ride?</label>
+          <select id="a-vehicle" required>
+            <option value="motorcycle">Motorcycle</option>
+            <option value="bicycle">Bicycle</option>
+            <option value="tricycle">Tricycle (keke)</option>
+            <option value="car">Car</option>
+            <option value="van">Van</option>
+          </select></div>
+        <h3>Your ID</h3>
+        <p class="muted">We use this only to confirm who you are. Only our admins can see it.</p>
+        <div><label for="a-idtype">ID type</label>
+          <select id="a-idtype" required>
+            <option value="nin">NIN (slip or card)</option>
+            <option value="drivers_licence">Driver's licence</option>
+            <option value="voters_card">Voter's card</option>
+            <option value="passport">International passport</option>
+          </select></div>
+        <div><label for="a-idnumber">ID number</label><input id="a-idnumber" minlength="4" maxlength="40" autocomplete="off" required></div>
+        <div><label for="a-idfront">Photo of the ID (front)</label>
+          <input id="a-idfront" type="file" accept="image/*,application/pdf" capture="environment" required>
+          <img class="photo-preview hidden" id="p-idfront" alt="ID front"></div>
+        <div><label for="a-idback">Photo of the ID (back, if it has one)</label>
+          <input id="a-idback" type="file" accept="image/*,application/pdf" capture="environment">
+          <img class="photo-preview hidden" id="p-idback" alt="ID back"></div>
+        <div><label for="a-selfie">A clear photo of your face</label>
+          <input id="a-selfie" type="file" accept="image/*" capture="user" required>
+          <img class="photo-preview hidden" id="p-selfie" alt="Selfie"></div>
+        <h3>Your ride</h3>
+        <div><label for="a-plate">Plate number (if any)</label><input id="a-plate" maxlength="20" placeholder="e.g. LSD 123 AB"></div>
+        <div><label for="a-area">Area you want to deliver in</label><input id="a-area" maxlength="120" placeholder="e.g. Lekki, Ajah"></div>
+        <div><label for="a-note">Anything else? (optional)</label><textarea id="a-note" maxlength="500" rows="2"></textarea></div>
+        <button type="submit">Send application</button>
+        <button type="button" class="secondary" id="back-to-login">Back to sign in</button>
+      </form>
+    </section>
+
+    <section id="applied" class="card hidden">
+      <h2>Application received ✅</h2>
+      <p>Thanks! We'll review it and send you an SMS as soon as you're approved. Then come back here and sign in.</p>
+      <button type="button" class="secondary" id="applied-back">Back to sign in</button>
+    </section>
+
+    <section id="app" class="hidden">
+      <div id="install" class="banner warn hidden">
+        Install this app on your phone so offers can reach you: <button id="install-btn" class="small" type="button">Install</button>
+      </div>
+      <div id="alerts" class="banner warn hidden">
+        <div id="alerts-text">Turn on alerts so new deliveries reach you even when this app is closed.</div>
+        <button id="alerts-btn" class="small" type="button" style="margin-top:8px">🔔 Turn on alerts</button>
+      </div>
+      <div id="gps" class="muted"></div>
+      <div id="jobs"></div>
+      <p id="empty" class="muted hidden">No deliveries right now. Keep this app open: you'll hear a chime when an admin assigns you one.</p>
+    </section>
+  </main>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+          integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+  <script src="/static/common.js"></script>
+  <script src="/rider/rider.js"></script>
+</body>
+</html>

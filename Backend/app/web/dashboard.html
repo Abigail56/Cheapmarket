@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="referrer" content="strict-origin-when-cross-origin">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex">
+  <title>Live deliveries · Cheapmarketdeal</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+        integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+  <link rel="icon" href="/rider/icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/static/common.css">
+  <style>
+    .grid { display: grid; gap: 14px; grid-template-columns: 380px 1fr; align-items: start; }
+    @media (max-width: 900px) { .grid { grid-template-columns: 1fr; } }
+    .item { border-top: 1px solid var(--line); padding: 12px 0; }
+    .item:first-of-type { border-top: 0; }
+    .item .row { gap: 6px; }
+    .feed { max-height: 320px; overflow: auto; font-size: 14px; }
+    .feed div { padding: 6px 0; border-top: 1px solid var(--line); }
+    .feed .alert { color: var(--bad); font-weight: 600; }
+    .feed .good { color: var(--good); font-weight: 600; }
+    .count { background: var(--brand); color: var(--brand-ink); border-radius: 999px; padding: 0 8px; font-size: 13px; margin-left: 6px; }
+    .count.zero { background: var(--chip); color: var(--muted); }
+    .docs { display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
+    .doc { display: flex; flex-direction: column; align-items: center; gap: 4px; width: 96px; min-height: 0;
+           padding: 6px; border-radius: 10px; background: var(--chip); color: var(--text); font-size: 12px; font-weight: 600; }
+    .reasons { margin: 6px 0 0; padding-left: 18px; font-size: 13px; color: var(--muted); }
+    .reasons li { margin: 2px 0; }
+    .doc img { width: 84px; height: 64px; object-fit: cover; border-radius: 6px; }
+  </style>
+</head>
+<body>
+  <header class="bar">
+    <h1><span class="brand">Cheapmarketdeal</span> · Live deliveries</h1>
+    <span id="live" class="status-dot" title="Live connection"></span>
+    <span id="sound"></span>
+    <button id="logout" class="small secondary hidden" type="button">Log out</button>
+  </header>
+  <main class="wide">
+    <section id="login" class="card hidden" style="max-width:420px;margin:40px auto">
+      <h2>Admin sign in</h2>
+      <form id="login-form" class="stack">
+        <div><label for="email">Email</label><input id="email" type="email" autocomplete="username" required></div>
+        <div><label for="password">Password</label><input id="password" type="password" autocomplete="current-password" required></div>
+        <button type="submit">Sign in</button>
+      </form>
+      <div class="or hidden" id="or-login">or</div>
+      <div id="google-login" class="google-btn hidden"></div>
+    </section>
+    <section id="app" class="grid hidden">
+      <div>
+        <div class="card hidden" id="apps-card"><h2>Rider applications <span id="n-apps" class="count"></span></h2><div id="apps"></div></div>
+        <div class="card"><h2>Needs a rider <span id="n-waiting" class="count"></span></h2><div id="waiting"></div></div>
+        <div class="card"><h2>In progress <span id="n-active" class="count"></span></h2><div id="active"></div></div>
+      </div>
+      <div>
+        <div class="card"><h2>Riders on the map</h2><div id="map" class="map tall"></div><div id="riders" class="muted"></div></div>
+        <div class="card"><h2>Live feed</h2><div id="feed" class="feed"><p class="muted" id="feed-empty">Waiting for events: new orders, riders accepting, deliveries…</p></div></div>
+      </div>
+    </section>
+  </main>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+          integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+  <script src="/static/common.js"></script>
+  <script src="/static/dashboard.js"></script>
+</body>
+</html>

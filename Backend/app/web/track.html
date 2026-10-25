@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="referrer" content="strict-origin-when-cross-origin">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#1f8a4c">
+  <meta name="robots" content="noindex">
+  <title>Track your order · Cheapmarketdeal</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+        integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+  <link rel="icon" href="/rider/icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/static/common.css">
+  <style>
+    .steps { list-style: none; padding: 0; margin: 8px 0 0; }
+    .steps li { display: flex; gap: 10px; align-items: center; padding: 6px 0; color: var(--muted); }
+    .steps li::before { content: ""; width: 12px; height: 12px; border-radius: 50%; border: 2px solid var(--line); flex: none; }
+    .steps li.done { color: var(--text); }
+    .steps li.done::before { background: var(--brand); border-color: var(--brand); }
+    .steps li.now { font-weight: 700; color: var(--text); }
+    .steps li.now::before { background: var(--warn); border-color: var(--warn); }
+    .eta { font-size: 28px; font-weight: 800; }
+  </style>
+</head>
+<body>
+  <header class="bar">
+    <h1><span class="brand">Cheapmarketdeal</span> · Track order</h1>
+    <span id="live" class="status-dot" title="Live updates"></span>
+  </header>
+  <main>
+    <div id="error" class="banner bad hidden"></div>
+    <section id="view" class="hidden">
+      <div class="card">
+        <div class="row"><h2 id="number"></h2><span id="status" class="chip"></span></div>
+        <div id="eta" class="hidden"><div class="eta" id="eta-text"></div><div class="muted" id="seen"></div></div>
+        <ol class="steps" id="steps"></ol>
+      </div>
+      <div class="card hidden" id="rider-card">
+        <h2 id="rider-line"></h2>
+        <div class="map" id="map"></div>
+        <a id="call" class="btn secondary hidden" href="#">📞 Call your rider</a>
+      </div>
+      <div class="card hidden" id="address-card">
+        <h2>Delivery address</h2>
+        <p id="address"></p>
+        <p class="muted" id="landmark"></p>
+        <form id="address-form" class="stack hidden">
+          <p class="muted">Help the rider find you. You can change this until the rider sets off.</p>
+          <div><label for="lm">Landmark</label><input id="lm" maxlength="255" placeholder="e.g. Blue gate opposite the church"></div>
+          <div><label for="nt">Notes for the rider</label><input id="nt" maxlength="500" placeholder="e.g. Call me at the gate"></div>
+          <button type="button" class="secondary" id="pin-me">📍 Use my current location as the drop-off point</button>
+          <button type="submit">Save</button>
+        </form>
+      </div>
+      <div class="card">
+        <h2>Your order</h2>
+        <p id="items"></p>
+        <p><strong id="total"></strong> · <span id="payment" class="muted"></span></p>
+      </div>
+    </section>
+  </main>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+          integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+  <script src="/static/common.js"></script>
+  <script src="/static/track.js"></script>
+</body>
+</html>

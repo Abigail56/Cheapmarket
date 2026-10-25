@@ -1,0 +1,75 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# The API lives in Backend/; every step runs from there
+defaults:
+  run:
+    working-directory: Backend
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: cmd_user
+          POSTGRES_PASSWORD: cmd_password
+          POSTGRES_DB: cmd_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U cmd_user -d cmd_test"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports: ["6379:6379"]
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s --health-timeout 3s --health-retries 10
+
+    env:
+      POSTGRES_USER: cmd_user
+      POSTGRES_PASSWORD: cmd_password
+      POSTGRES_HOST: localhost
+      SECRET_KEY: ci-only-secret-key-0123456789-abcdefghijklmnop
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: "0.13.1"
+          enable-cache: true
+          cache-dependency-glob: Backend/uv.lock
+
+      - name: Install dependencies (exactly as locked)
+        run: uv sync --locked --python 3.12
+
+      - name: Lint
+        run: uv run ruff check .
+
+      - name: Migrations apply cleanly and match the models
+        env:
+          POSTGRES_DB: cmd_test
+        run: |
+          uv run alembic upgrade head
+          uv run alembic check
+          uv run alembic downgrade base
+
+      - name: Tests
+        run: uv run pytest -q
+
+  docker:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Image builds
+        run: docker build -t cheapmarketdeal-api:ci .
+        working-directory: Backend

@@ -1,0 +1,109 @@
+# PRODUCTION setup. On the server:
+#   cp .env.production.example .env   # then fill it in
+#   docker compose -f docker-compose.prod.yml up -d --build
+#   docker compose -f docker-compose.prod.yml exec api python -m scripts.seed
+#
+# Differences from the development docker-compose.yml:
+# - code is baked into the image (no live reload, no folder mounted over it)
+# - only Caddy is reachable from outside (ports 80/443, automatic HTTPS for $DOMAIN);
+#   Postgres, Redis and the API itself are on the internal network only
+# - Redis requires REDIS_PASSWORD
+# - migrations run once in their own container before the API starts
+# - every long-running service restarts by itself after a crash or reboot
+name: cheapmarketdeal-prod
+
+x-app: &app
+  build: .
+  image: cheapmarketdeal-api:prod
+  env_file: .env
+  environment:
+    POSTGRES_HOST: db
+    REDIS_HOST: redis
+    # Only Caddy (on this pinned network) may set X-Forwarded-For, so rate limits see real IPs
+    FORWARDED_ALLOW_IPS: 172.28.0.0/16
+  volumes: ["media:/code/media"]
+
+services:
+  db:
+    image: postgres:16-alpine
+    env_file: .env
+    volumes: [pgdata:/var/lib/postgresql/data]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    env_file: .env
+    command: sh -c 'exec redis-server --appendonly yes --requirepass "$$REDIS_PASSWORD"'
+    volumes: [redisdata:/data]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "REDISCLI_AUTH=\"$$REDIS_PASSWORD\" redis-cli ping | grep -q PONG"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  migrate:
+    <<: *app
+    command: alembic upgrade head
+    restart: "no"
+    depends_on:
+      db: { condition: service_healthy }
+
+  api:
+    <<: *app
+    restart: unless-stopped
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+      redis: { condition: service_healthy }
+
+  # Sends queued SMS/emails and re-checks card payments whose webhook never came
+  worker:
+    <<: *app
+    command: python -m app.worker
+    restart: unless-stopped
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+      redis: { condition: service_healthy }
+
+  # HTTPS in front of the API. Point your domain's DNS at this server first:
+  # Caddy then gets and renews the certificate by itself
+  caddy:
+    image: caddy:2-alpine
+    environment:
+      DOMAIN: ${DOMAIN:?set DOMAIN in .env}  # Caddy needs only this, not the app's secrets
+    ports: ["80:80", "443:443", "443:443/udp"]
+    volumes: ["./Caddyfile:/etc/caddy/Caddyfile:ro", "caddydata:/data", "caddyconfig:/config"]
+    restart: unless-stopped
+    depends_on: [api]
+
+  # Nightly pg_dump into ./backups (see scripts/backup.sh). Copy that folder off
+  # the server too: a backup on the same disk dies with the disk.
+  backup:
+    image: postgres:16-alpine
+    user: "1000:1000"
+    env_file: .env
+    environment:
+      PGHOST: db
+      BACKUP_DIR: /backups
+    volumes: ["./backups:/backups", "./scripts/backup.sh:/backup.sh:ro", "./scripts/restore.sh:/restore.sh:ro"]
+    entrypoint: ["sh", "-c", "while true; do sh /backup.sh; sleep $${BACKUP_INTERVAL_SECONDS:-86400}; done"]
+    restart: unless-stopped
+    depends_on:
+      db: { condition: service_healthy }
+
+networks:
+  default:
+    ipam:
+      config: [{ subnet: 172.28.0.0/16 }]
+
+volumes:
+  pgdata:
+  redisdata:
+  media:  # uploaded product/category images and delivery photos: back this up too
+  caddydata:  # HTTPS certificates
+  caddyconfig:

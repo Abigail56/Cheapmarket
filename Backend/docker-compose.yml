@@ -1,0 +1,74 @@
+# DEVELOPMENT setup (live reload, code mounted from this folder).
+# On a live server use docker-compose.prod.yml instead.
+# Fixed project name: keeps using the existing database/redis volumes wherever this file lives
+name: cheapmarketdeal-api
+
+services:
+  db:
+    image: postgres:16-alpine
+    env_file: .env
+    ports: ["127.0.0.1:${DB_HOST_PORT:-5432}:5432"]  # this machine only
+    volumes: [pgdata:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    command: redis-server --appendonly yes
+    ports: ["127.0.0.1:${REDIS_HOST_PORT:-6379}:6379"]  # this machine only
+    volumes: [redisdata:/data]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  api:
+    build: .
+    env_file: .env
+    environment:
+      POSTGRES_HOST: db
+      REDIS_HOST: redis
+    ports: ["${API_HOST_PORT:-8000}:8000"]
+    volumes: [".:/code"]
+    restart: unless-stopped
+    command: sh -c "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload --no-access-log --timeout-graceful-shutdown 5"
+    depends_on:
+      db: { condition: service_healthy }
+      redis: { condition: service_healthy }
+
+  # Sends queued SMS/emails and re-checks card payments whose webhook never came
+  worker:
+    build: .
+    env_file: .env
+    environment:
+      POSTGRES_HOST: db
+      REDIS_HOST: redis
+    volumes: [".:/code"]
+    command: python -m app.worker
+    restart: unless-stopped
+    depends_on:
+      db: { condition: service_healthy }
+      redis: { condition: service_healthy }
+
+  # Nightly pg_dump into ./backups (see scripts/backup.sh). Copy that folder off
+  # the server too: a backup on the same disk dies with the disk.
+  backup:
+    image: postgres:16-alpine
+    user: "1000:1000"  # dumps in ./backups belong to you, not root
+    env_file: .env
+    environment:
+      PGHOST: db
+      BACKUP_DIR: /backups
+    volumes: ["./backups:/backups", "./scripts/backup.sh:/backup.sh:ro", "./scripts/restore.sh:/restore.sh:ro"]
+    entrypoint: ["sh", "-c", "while true; do sh /backup.sh; sleep $${BACKUP_INTERVAL_SECONDS:-86400}; done"]
+    restart: unless-stopped
+    depends_on:
+      db: { condition: service_healthy }
+
+volumes:
+  pgdata:
+  redisdata:
