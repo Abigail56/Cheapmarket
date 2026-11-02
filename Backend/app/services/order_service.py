@@ -154,6 +154,7 @@ async def checkout(
     await session.commit()
     await catalog_service.invalidate_catalog_cache()  # stock changed
     await notifications.order_event(order, "placed")
+    await notifications.admin_new_order(order)
     await events.publish([events.ADMIN], "order.placed",
                          {"order_id": order.id, "order_number": order.order_number,
                           "total": order.total, "payment_method": order.payment_method.value})

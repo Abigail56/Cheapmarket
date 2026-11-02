@@ -5,6 +5,7 @@ Three jobs, run side by side:
   * every RECONCILE_INTERVAL_SECONDS, re-checks card payments the webhook missed
   * every 15 s, hands deliveries a rider didn't accept in time back to the admin
   * background jobs (checking a rider applicant's ID with the government record)
+  * every few hours, clears bell notifications older than 30 days
 
 Run one or several; a Redis lock stops two workers reconciling at the same time,
 and each queued message is popped by exactly one worker."""
@@ -19,12 +20,13 @@ from app.core.config import settings
 from app.core.logging import configure_logging, configure_sentry
 from app.db.redis import SOCKET_TIMEOUT, close_redis, redis_client
 from app.db.session import AsyncSessionLocal, engine
-from app.services import delivery_service, id_verification, notifications, payment_service
+from app.services import delivery_service, id_verification, inbox, notifications, payment_service
 
 log = logging.getLogger("app.worker")
 RECONCILE_LOCK = "lock:reconcile"
 EXPIRE_LOCK = "lock:expire-offers"
 EXPIRE_INTERVAL_SECONDS = 15
+PRUNE_INTERVAL_SECONDS = 6 * 3600
 
 
 async def process_one_notification(timeout: int = 2) -> bool:
@@ -76,6 +78,19 @@ async def expire_offers_once() -> int | None:
         return expired
     finally:
         await redis_client.delete(EXPIRE_LOCK)
+
+
+async def _prune_loop(stop: asyncio.Event) -> None:
+    while not stop.is_set():
+        try:
+            async with AsyncSessionLocal() as session:
+                await inbox.prune(session)
+        except Exception:
+            log.exception("Clearing old bell notifications failed")
+        try:
+            await asyncio.wait_for(stop.wait(), timeout=PRUNE_INTERVAL_SECONDS)
+        except TimeoutError:
+            pass
 
 
 async def _expire_loop(stop: asyncio.Event) -> None:
@@ -151,7 +166,7 @@ async def main() -> None:
     log.info("Worker started (sms=%s, email=%s)", settings.SMS_BACKEND, settings.EMAIL_BACKEND)
     try:
         await asyncio.gather(_notification_loop(stop), _reconcile_loop(stop), _expire_loop(stop),
-                             _job_loop(stop))
+                             _job_loop(stop), _prune_loop(stop))
     finally:
         await close_redis()
         await engine.dispose()

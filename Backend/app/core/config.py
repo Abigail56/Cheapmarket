@@ -79,7 +79,7 @@ class Settings(BaseSettings):
     SMTP_USER: str | None = None
     SMTP_PASSWORD: str | None = None
     SMTP_STARTTLS: bool = True
-    EMAIL_FROM: str = "Cheapmarketdeal <no-reply@cheapmarketdeals.com>"
+    EMAIL_FROM: str = "Cheapmarket <no-reply@cheapmarketdeals.com>"
     NOTIFICATION_MAX_ATTEMPTS: int = 3
 
     # Image uploads. "local" saves under MEDIA_DIR and serves it at /media
@@ -134,6 +134,9 @@ class Settings(BaseSettings):
 
     # First admin (used by scripts/seed.py). CHANGE THE PASSWORD in any real environment.
     ADMIN_EMAIL: str = "admin@cheapmarketdeals.com"
+    # Comma-separated: who gets an SMS/email for every new order
+    ADMIN_ALERT_PHONES: str = ""
+    ADMIN_ALERT_EMAILS: str = ""
     ADMIN_PASSWORD: str = "ChangeMe123!"
     ADMIN_NAME: str = "Store Admin"
 

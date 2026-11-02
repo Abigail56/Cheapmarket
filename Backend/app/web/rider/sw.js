@@ -1,8 +1,9 @@
 // Makes the rider app installable and opens it instantly. API calls always go to the
 // network (deliveries must be live), only the app's own files are cached.
-const CACHE = "cmd-rider-v2";
+const CACHE = "cmd-rider-v6";
 const SHELL = ["/rider/", "/rider/rider.js", "/static/common.js", "/static/common.css",
-               "/rider/icon.svg", "/rider/manifest.webmanifest"];
+               "/rider/icon.svg", "/rider/icon-192.png", "/rider/icon-512.png", "/rider/icon-maskable-512.png",
+               "/rider/manifest.webmanifest", "/static/rider-bg.jpg"];
 
 self.addEventListener("install", (e) => {
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting()));
@@ -31,7 +32,7 @@ self.addEventListener("fetch", (e) => {
 self.addEventListener("push", (e) => {
   let msg = {};
   try { msg = e.data ? e.data.json() : {}; } catch { msg = { body: e.data && e.data.text() }; }
-  const title = msg.title || "Cheapmarketdeal Rider";
+  const title = msg.title || "Cheapmarket Rider";
   e.waitUntil((async () => {
     const wins = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
     const onScreen = wins.find((w) => w.visibilityState === "visible");
@@ -46,8 +47,8 @@ self.addEventListener("push", (e) => {
       requireInteraction: true,    // stays until the rider taps it
       silent: false,
       vibrate: [400, 100, 400, 100, 400, 100, 800],
-      icon: "/rider/icon.svg",
-      badge: "/rider/icon.svg",
+      icon: "/rider/icon-192.png",
+      badge: "/rider/icon-192.png",
       data: { url: msg.url || "/rider/" },
     });
   })());

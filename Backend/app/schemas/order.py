@@ -18,6 +18,7 @@ class OrderRead(OrderBase, ReadModel):
     id: uuid.UUID
     created_at: datetime
     items: list[OrderItemRead]
+    tracking_token: str  # the key to /track/<token>; only sent to people who can see the order
 
 
 class QuoteRequest(SQLModel):

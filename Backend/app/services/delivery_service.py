@@ -36,7 +36,8 @@ from app.services import audit, events, notifications, order_service, storage
 from app.services.geo import distance_m, eta_minutes
 
 S = DeliveryStatus
-CAN_EDIT_ADDRESS = (S.UNASSIGNED, S.ASSIGNED, S.ACCEPTED)
+CAN_EDIT_ADDRESS = (S.UNASSIGNED, S.ASSIGNED, S.ACCEPTED, S.FAILED)
+NEEDS_NEW_RIDER = (S.UNASSIGNED, S.FAILED)
 
 
 def _now() -> datetime:
@@ -107,12 +108,16 @@ async def delivery_for_order(session: AsyncSession, order: Order, *, lock: bool 
 
 # ------------------------------------ admin -----------------------------------
 async def assign(session: AsyncSession, order: Order, rider: User, admin: User) -> Delivery:
-    if order.status not in (OrderStatus.CONFIRMED, OrderStatus.PACKED):
+    delivery = await delivery_for_order(session, order, lock=True)
+    # an order already out can go to a new rider only if the last attempt didn't work out
+    retry = (order.status == OrderStatus.OUT_FOR_DELIVERY and delivery is not None
+             and delivery.status in NEEDS_NEW_RIDER)
+    if order.status not in (OrderStatus.CONFIRMED, OrderStatus.PACKED) and not retry:
         raise BadRequest("Riders can only be assigned to confirmed or packed orders")
     if rider.role != UserRole.RIDER or not rider.is_active:
         raise BadRequest("That user is not an active rider")
-    delivery = await delivery_for_order(session, order, lock=True)
-    previous_rider = delivery.rider_id if delivery else None
+    # a rider who already reported failure knows it's over: nothing to tell them
+    previous_rider = delivery.rider_id if delivery and delivery.status != S.FAILED else None
     if delivery and delivery.status in (S.EN_ROUTE, S.ARRIVED, S.DELIVERED):
         raise Conflict("This delivery is already on the road", code="wrong_delivery_state")
     if delivery is None:
@@ -123,6 +128,14 @@ async def assign(session: AsyncSession, order: Order, rider: User, admin: User) 
     delivery.accept_deadline = _now() + timedelta(seconds=settings.RIDER_ACCEPT_SECONDS)
     delivery.accepted_at = None
     delivery.address_confirmed_at = None  # the new rider confirms for themselves
+    # a fresh attempt: nothing carries over from the last rider, a waived location check included
+    delivery.started_at = delivery.arrived_at = delivery.code_sent_at = None
+    delivery.code_hash = delivery.code_expires_at = None
+    delivery.code_attempts = 0
+    delivery.failure_reason = None
+    delivery.geofence_override_at = delivery.geofence_override_by = None
+    delivery.geofence_override_reason = None
+    delivery.last_latitude = delivery.last_longitude = delivery.last_location_at = None
     session.add(delivery)
     session.add(OrderStatusHistory(order_id=order.id, status=order.status, changed_by=admin.id,
                                    note=f"Assigned to rider {rider.full_name}"))
@@ -132,7 +145,8 @@ async def assign(session: AsyncSession, order: Order, rider: User, admin: User) 
 
     if previous_rider and previous_rider != rider.id:
         await events.publish([events.rider_stream(previous_rider)], "delivery.unassigned",
-                             {"delivery_id": delivery.id, "order_id": order.id})
+                             {"delivery_id": delivery.id, "order_id": order.id,
+                              "order_number": order.order_number})
     await _event(delivery, "delivery.assigned", order_number=order.order_number,
                  rider_name=rider.full_name, accept_deadline=delivery.accept_deadline)
     minutes = settings.RIDER_ACCEPT_SECONDS // 60
@@ -141,7 +155,7 @@ async def assign(session: AsyncSession, order: Order, rider: User, admin: User) 
                                    tag=f"offer-{delivery.id}")
     if rider.phone:
         await notifications.enqueue("sms", rider.phone,
-                                    f"Cheapmarketdeal: new delivery {order.order_number}. Open the "
+                                    f"Cheapmarket: new delivery {order.order_number}. Open the "
                                     f"rider app and accept within {minutes} minutes.")
     return delivery
 
@@ -154,7 +168,8 @@ async def override_geofence(session: AsyncSession, delivery: Delivery, admin: Us
     session.add(delivery)
     audit.record(session, admin, "delivery.geofence_override", delivery, changes={"reason": reason})
     await session.commit()
-    await _event(delivery, "delivery.geofence_overridden", reason=reason)
+    order = await _order(session, delivery)
+    await _event(delivery, "delivery.geofence_overridden", reason=reason, order_number=order.order_number)
     return delivery
 
 
@@ -166,17 +181,17 @@ async def expire_unaccepted(session: AsyncSession) -> int:
     expired = []
     for delivery in rows:
         order = await _order(session, delivery)
-        expired.append((delivery, delivery.rider_id))
+        expired.append((delivery, delivery.rider_id, order.order_number))
         delivery.status, delivery.rider_id = S.UNASSIGNED, None
         session.add(delivery)
         session.add(OrderStatusHistory(order_id=order.id, status=order.status,
                                        note="Rider did not accept in time; needs a new rider"))
     if expired:
         await session.commit()
-    for delivery, rider_id in expired:
+    for delivery, rider_id, order_number in expired:
         await events.publish([events.ADMIN, events.rider_stream(rider_id)], "delivery.expired",
                              {"delivery_id": delivery.id, "order_id": delivery.order_id,
-                              "status": delivery.status.value})
+                              "order_number": order_number, "status": delivery.status.value})
     return len(expired)
 
 
@@ -192,7 +207,7 @@ async def accept(session: AsyncSession, delivery: Delivery, rider: User) -> Deli
     session.add(OrderStatusHistory(order_id=order.id, status=order.status, changed_by=rider.id,
                                    note=f"Rider {rider.full_name} accepted"))
     await session.commit()
-    await _event(delivery, "delivery.accepted", rider_name=rider.full_name)
+    await _event(delivery, "delivery.accepted", rider_name=rider.full_name, order_number=order.order_number)
     await notifications.order_event(order, "rider_accepted", rider=rider.full_name.split()[0])
     return delivery
 
@@ -224,7 +239,9 @@ async def confirm_address(session: AsyncSession, delivery: Delivery, rider: User
     delivery.address_confirmed_at = _now()
     session.add(delivery)
     await session.commit()
-    await _event(delivery, "delivery.address_confirmed")
+    order = await _order(session, delivery)
+    await _event(delivery, "delivery.address_confirmed", order_number=order.order_number,
+                 rider_name=rider.full_name)
     return delivery
 
 
@@ -236,11 +253,17 @@ async def start(session: AsyncSession, delivery: Delivery, rider: User) -> Deliv
     delivery.status, delivery.started_at = S.EN_ROUTE, _now()
     session.add(delivery)
     # the order follows: confirmed -> packed -> out_for_delivery (these commit, and text the customer)
-    if order.status == OrderStatus.CONFIRMED:
-        await order_service.change_status(session, order, OrderStatus.PACKED, rider, "Packed")
-    await order_service.change_status(session, order, OrderStatus.OUT_FOR_DELIVERY, rider,
-                                      "Rider started the journey")
-    await _event(delivery, "delivery.started")
+    if order.status == OrderStatus.OUT_FOR_DELIVERY:  # second attempt: the order is already out
+        session.add(OrderStatusHistory(order_id=order.id, status=order.status, changed_by=rider.id,
+                                       note="New rider started the journey"))
+        await session.commit()
+        await notifications.order_event(order, "out_for_delivery")
+    else:
+        if order.status == OrderStatus.CONFIRMED:
+            await order_service.change_status(session, order, OrderStatus.PACKED, rider, "Packed")
+        await order_service.change_status(session, order, OrderStatus.OUT_FOR_DELIVERY, rider,
+                                          "Rider started the journey")
+    await _event(delivery, "delivery.started", order_number=order.order_number, rider_name=rider.full_name)
     return delivery
 
 
@@ -274,8 +297,9 @@ async def arrive(session: AsyncSession, delivery: Delivery, rider: User, latitud
     delivery.status, delivery.arrived_at = S.ARRIVED, _now()
     session.add(delivery)
     await session.commit()
-    await _event(delivery, "delivery.arrived")
-    await notifications.order_event(await _order(session, delivery), "rider_arrived")
+    order = await _order(session, delivery)
+    await _event(delivery, "delivery.arrived", order_number=order.order_number, rider_name=rider.full_name)
+    await notifications.order_event(order, "rider_arrived")
     return delivery
 
 
@@ -296,13 +320,15 @@ async def send_code(session: AsyncSession, delivery: Delivery, rider: User, lati
     await session.commit()
     order = await _order(session, delivery)
     minutes = settings.DELIVERY_CODE_TTL_SECONDS // 60
-    text = (f"Cheapmarketdeal: your delivery code for order {order.order_number} is {code}. "
-            f"Give it to the rider ONLY when you have your items. Valid for {minutes} minutes.")
+    text = (f"Cheapmarket: your delivery code for order {order.order_number} is {code}. "
+            f"Once you have your items, type it on the rider's phone. Please don't share it "
+            f"before then. It works for {minutes} minutes.")
     await notifications.enqueue("sms", order.customer_phone, text)
     if order.customer_email:
         await notifications.enqueue("email", order.customer_email, text,
                                     subject=f"Delivery code for {order.order_number}")
-    await _event(delivery, "delivery.code_sent")  # the code itself is never in an event
+    # the code itself is never in an event
+    await _event(delivery, "delivery.code_sent", order_number=order.order_number, rider_name=rider.full_name)
     return {"sent": True, "expires_in_minutes": minutes}
 
 
@@ -321,7 +347,9 @@ async def complete(session: AsyncSession, delivery: Delivery, rider: User, *, co
         left = settings.DELIVERY_CODE_MAX_ATTEMPTS - delivery.code_attempts
         session.add(delivery)
         await session.commit()
-        await _event(delivery, "delivery.code_wrong", attempts=delivery.code_attempts)
+        order = await _order(session, delivery)
+        await _event(delivery, "delivery.code_wrong", attempts=delivery.code_attempts,
+                     order_number=order.order_number)
         raise BadRequest(f"That code is not right. {left} tries left." if left else
                          "That code is not right. Send the customer a new code.", code="wrong_code")
 
@@ -351,6 +379,7 @@ async def fail(session: AsyncSession, delivery: Delivery, rider: User, reason: s
                                    note=f"Delivery failed: {reason}"))
     await session.commit()
     await _event(delivery, "delivery.failed", reason=reason, order_number=order.order_number)
+    await notifications.order_event(order, "delivery_failed")
     return delivery
 
 
@@ -387,7 +416,8 @@ async def customer_correct_address(session: AsyncSession, order: Order, *, latit
     delivery.address_corrected_at = _now()
     session.add(delivery)
     await session.commit()
-    await _event(delivery, "delivery.address_corrected", rider_must_reconfirm=reconfirm)
+    await _event(delivery, "delivery.address_corrected", rider_must_reconfirm=reconfirm,
+                 order_number=order.order_number)
     if delivery.rider_id and delivery.status in (S.ASSIGNED, S.ACCEPTED):
         await notifications.push_rider(delivery.rider_id, f"Address changed: {order.order_number}",
                                        "The customer updated the delivery address. Check it and "
@@ -438,6 +468,9 @@ def tracking_view(order: Order, delivery: Delivery | None, history: list[OrderSt
         "rider_position": None,
         "eta_minutes": None,
         "delivered_at": delivery.delivered_at,
+        # whether a code is on its way, never the code itself
+        "code_sent": delivery.status == S.ARRIVED and delivery.code_sent_at is not None,
+        "proof_photo_url": delivery.proof_photo_url if delivery.status == S.DELIVERED else None,
     }
     seen = _aware(delivery.last_location_at)
     fresh = seen and (_now() - seen).total_seconds() <= settings.TRACKING_FRESH_SECONDS

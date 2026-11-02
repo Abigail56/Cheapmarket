@@ -1,0 +1,6 @@
+User-agent: *
+Disallow: /account
+Disallow: /cart
+Disallow: /checkout
+Disallow: /orders/
+Disallow: /mock-pay

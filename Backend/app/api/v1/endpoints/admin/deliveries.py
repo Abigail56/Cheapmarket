@@ -22,17 +22,26 @@ async def board(_: AdminUser, session: SessionDep) -> dict:
     """Everything the live dashboard needs in one call: orders waiting for a rider,
     deliveries in progress (with the rider's last position) and the riders."""
     waiting_orders = (await session.exec(
-        select(Order).where(Order.status.in_([OrderStatus.CONFIRMED, OrderStatus.PACKED]))
+        select(Order).where(Order.status.in_([OrderStatus.CONFIRMED, OrderStatus.PACKED,
+                                              OrderStatus.OUT_FOR_DELIVERY]))
         .order_by(Order.created_at))).all()
     deliveries = {d.order_id: d for d in (await session.exec(select(Delivery).where(
         Delivery.order_id.in_([o.id for o in waiting_orders])))).all()} if waiting_orders else {}
+    new_orders = (await session.exec(
+        select(Order).where(Order.status == OrderStatus.PENDING).order_by(Order.created_at))).all()
+    delivered = (await session.exec(
+        select(Delivery, Order, User).join(Order, Order.id == Delivery.order_id)
+        .join(User, User.id == Delivery.rider_id, isouter=True)
+        .where(Delivery.status == DeliveryStatus.DELIVERED)
+        .order_by(Delivery.delivered_at.desc()).limit(8))).all()
     needs_rider = [
         {"order_number": o.order_number, "customer_name": o.customer_name, "total": float(o.total),
          "payment_method": o.payment_method.value, "placed_at": o.created_at,
-         "delivery_address": o.delivery_address}
+         "delivery_address": o.delivery_address,
+         "failure_reason": deliveries[o.id].failure_reason if o.id in deliveries else None}
         for o in waiting_orders
-        if o.id not in deliveries or deliveries[o.id].status in (DeliveryStatus.UNASSIGNED,
-                                                                 DeliveryStatus.FAILED)
+        if (o.id in deliveries and deliveries[o.id].status in delivery_service.NEEDS_NEW_RIDER)
+        or (o.id not in deliveries and o.status != OrderStatus.OUT_FOR_DELIVERY)
     ]
     active = (await session.exec(
         select(Delivery, Order, User).join(Order, Order.id == Delivery.order_id)
@@ -58,9 +67,17 @@ async def board(_: AdminUser, session: SessionDep) -> dict:
                           "documents": [{"id": str(d["id"]), "kind": d["kind"].value,
                                          "content_type": d["content_type"]} for d in docs.get(a.id, [])]}
                          for a, u in applications],
+        "new_orders": [{"order_number": o.order_number, "customer_name": o.customer_name,
+                        "total": float(o.total), "payment_method": o.payment_method.value,
+                        "payment_status": o.payment_status.value, "placed_at": o.created_at,
+                        "delivery_address": o.delivery_address} for o in new_orders],
+        "delivered": [{"order_number": o.order_number, "customer_name": o.customer_name,
+                       "rider_name": r.full_name if r else None, "delivered_at": d.delivered_at,
+                       "proof_photo_url": d.proof_photo_url} for d, o, r in delivered],
         "needs_rider": needs_rider,
         "active": [{"delivery": DeliveryRead.model_validate(d).model_dump(mode="json"),
                     "order_number": o.order_number, "customer_name": o.customer_name,
+                    "customer_phone": o.customer_phone,
                     "delivery_address": o.delivery_address, "rider_name": r.full_name,
                     "rider_phone": r.phone} for d, o, r in active],
         "riders": [{"id": str(r.id), "name": r.full_name, "phone": r.phone, "busy": r.id in busy}

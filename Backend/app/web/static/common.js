@@ -16,10 +16,139 @@ function naira(amount) {
 }
 
 function ago(iso) {
-  const s = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 1000));
-  if (s < 60) return `${s}s ago`;
-  if (s < 3600) return `${Math.floor(s / 60)}m ago`;
-  return new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  const when = new Date(iso);
+  const s = Math.max(0, Math.round((Date.now() - when.getTime()) / 1000));
+  if (s < 60) return "just now";
+  if (s < 3600) return `${Math.floor(s / 60)} min ago`;
+  const time = when.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+  if (when.toDateString() === new Date().toDateString()) return time;
+  if (when.toDateString() === new Date(Date.now() - 86400000).toDateString()) return `Yesterday, ${time}`;
+  return `${when.toLocaleDateString([], { day: "numeric", month: "short" })}, ${time}`;
+}
+
+const ICONS = {
+  bell: '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 8 3 8H3s3-1 3-8"/><path d="M10.3 21a2 2 0 0 0 3.4 0"/></svg>',
+  soundOn: '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 5 6 9H2v6h4l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M19 5a10 10 0 0 1 0 14"/></svg>',
+  soundOff: '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 5 6 9H2v6h4l5 4z"/><path d="m22 9-6 6"/><path d="m16 9 6 6"/></svg>',
+  camera: '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3z"/><circle cx="12" cy="13" r="3.5"/></svg>',
+  eye: '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7"/><circle cx="12" cy="12" r="3"/></svg>',
+  eyeOff: '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7"/><circle cx="12" cy="12" r="3"/><path d="m3 3 18 18"/></svg>',
+  check: '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>',
+};
+
+// A friendly question box. Resolves to the typed text ("" if nothing was typed), to true
+// when there's no text box, or to null if they backed out.
+function ask({ title, text = "", input = false, placeholder = "", value = "", minLength = 0, ok = "OK", cancel = "Not now", danger = false }) {
+  return new Promise((resolve) => {
+    const box = document.createElement("dialog");
+    box.className = "ask";
+    box.innerHTML = `<form method="dialog">
+      <h2>${esc(title)}</h2>${text ? `<p>${esc(text)}</p>` : ""}
+      ${input ? `<textarea rows="2" maxlength="255" placeholder="${esc(placeholder)}" ${minLength ? `minlength="${minLength}" required` : ""}>${esc(value)}</textarea>` : ""}
+      <div class="row"><button type="button" class="secondary" data-no>${esc(cancel)}</button>
+      <button type="submit" class="${danger ? "danger" : ""}" value="yes">${esc(ok)}</button></div></form>`;
+    document.body.appendChild(box);
+    const field = $("textarea", box);
+    let answer = null;
+    $("[data-no]", box).onclick = () => box.close();
+    $("form", box).onsubmit = () => { answer = field ? field.value.trim() : true; };
+    box.addEventListener("close", () => { box.remove(); resolve(answer); });
+    box.showModal();
+  });
+}
+
+// ---------------------------------------------------------------- notification bell
+// The saved list of what happened (the server keeps it, so nothing is missed while away).
+// refresh() is called whenever a live event arrives and on each page poll.
+class Bell {
+  constructor(mount, session, { onOpen } = {}) {
+    this.session = session;
+    this.onOpen = onOpen;
+    this.items = [];
+    this.unread = null;  // null until the first load, so old alerts don't "ring" on opening
+    this.baseTitle = document.title;
+    mount.classList.add("bell");
+    mount.innerHTML = `
+      <button type="button" class="icon-btn" data-toggle aria-haspopup="true" aria-expanded="false" aria-label="Notifications">
+        ${ICONS.bell}<span class="bell-badge hidden" data-badge></span>
+      </button>
+      <div class="bell-panel hidden" data-panel>
+        <div class="bell-head"><span>Notifications</span><button type="button" class="quiet small" data-all>Mark all as read</button></div>
+        <div class="bell-list" data-list></div>
+      </div>`;
+    this.root = mount;
+    this.button = $("[data-toggle]", mount);
+    this.panel = $("[data-panel]", mount);
+    this.button.onclick = () => this.toggle();
+    $("[data-all]", mount).onclick = () => this.markAll();
+    document.addEventListener("click", (e) => { if (!mount.contains(e.target)) this.toggle(false); });
+    document.addEventListener("keydown", (e) => { if (e.key === "Escape") this.toggle(false); });
+    this.refresh().catch(() => {});
+  }
+
+  toggle(open = this.panel.classList.contains("hidden")) {
+    this.panel.classList.toggle("hidden", !open);
+    this.button.setAttribute("aria-expanded", String(open));
+    if (open) this.refresh().catch(() => {});
+  }
+
+  async refresh() {
+    const data = await this.session.api("/notifications");
+    const ring = this.unread !== null && data.unread > this.unread;
+    this.items = data.items;
+    this.unread = data.unread;
+    this.paint();
+    if (ring) {
+      this.button.classList.remove("bell-ring");
+      void this.button.offsetWidth;  // restart the little shake
+      this.button.classList.add("bell-ring");
+    }
+  }
+
+  paint() {
+    const badge = $("[data-badge]", this.root);
+    badge.textContent = this.unread > 99 ? "99+" : this.unread;
+    badge.classList.toggle("hidden", !this.unread);
+    this.button.setAttribute("aria-label", this.unread ? `Notifications, ${this.unread} unread` : "Notifications");
+    document.title = this.unread ? `(${this.unread}) ${this.baseTitle}` : this.baseTitle;
+    $("[data-all]", this.root).classList.toggle("hidden", !this.unread);
+    const list = $("[data-list]", this.root);
+    list.innerHTML = this.items.length ? this.items.map((n) => `
+      <button type="button" class="bell-item ${n.read_at ? "" : "unread"}" data-id="${esc(n.id)}">
+        <strong>${esc(n.title)}</strong><span>${esc(n.body)}</span><time>${esc(ago(n.created_at))}</time>
+      </button>`).join("") : `<div class="empty"><strong>You're all caught up</strong>New alerts will show up here.</div>`;
+    list.querySelectorAll("[data-id]").forEach((el) => { el.onclick = () => this.open(el.dataset.id); });
+  }
+
+  async open(id) {
+    const item = this.items.find((n) => n.id === id);
+    if (!item) return;
+    this.toggle(false);
+    if (!item.read_at) {
+      item.read_at = new Date().toISOString();
+      this.unread = Math.max(0, this.unread - 1);
+      this.paint();
+      this.session.api(`/notifications/${id}/read`, { method: "POST" }).catch(() => {});
+    }
+    this.onOpen?.(item);
+  }
+
+  async markAll() {
+    this.items.forEach((n) => { n.read_at ||= new Date().toISOString(); });
+    this.unread = 0;
+    this.paint();
+    await this.session.api("/notifications/read-all", { method: "POST" }).catch(() => {});
+  }
+}
+
+// Scroll to the card for an order and flash it, so a bell tap lands somewhere useful.
+function showOrder(orderNumber, missing) {
+  const el = orderNumber && document.querySelector(`[data-order="${CSS.escape(orderNumber)}"]`);
+  if (!el) { if (missing) toast(missing); return; }
+  el.scrollIntoView({ behavior: "smooth", block: "center" });
+  el.classList.remove("flash");
+  void el.offsetWidth;
+  el.classList.add("flash");
 }
 
 let toastTimer;
@@ -225,7 +354,7 @@ function adaptivePoll(fn, isLive) {
 
 // ---------------------------------------------------------------- sound
 // Browsers only allow sound after the user has tapped something, so each page shows an
-// "Enable sound" button once. The tones are generated, no audio files needed.
+// sound button in the header. The tones are generated, no audio files needed.
 const Sound = {
   ctx: null,
   out: null,
@@ -242,9 +371,9 @@ const Sound = {
       this.comp.connect(this.out).connect(this.ctx.destination);
     }
     this.wake();
-    try { localStorage.setItem("cmd.sound", "on"); } catch {}
     return this.ctx.state !== "closed";
   },
+  setEnabled(on) { try { localStorage.setItem("cmd.sound", on ? "on" : "off"); } catch {} },
   // Phones suspend web audio when the screen locks or the app is in the background.
   // Wake it whenever we're back on screen and before every alert, or alerts go silent.
   wake() {
@@ -296,23 +425,74 @@ const Sound = {
 
 // back on screen (screen unlocked, app reopened): make sure sound still works
 document.addEventListener("visibilitychange", () => { if (!document.hidden) Sound.wake(); });
-["touchstart", "pointerdown", "keydown"].forEach((ev) =>
-  document.addEventListener(ev, () => Sound.wake(), { passive: true, capture: true }));
+// Browsers allow sound only after a tap, so the first tap anywhere switches it on (unless muted).
+// A tap on the sound button is left to the button itself.
+["touchstart", "pointerdown", "keydown", "click"].forEach((ev) =>
+  document.addEventListener(ev, (e) => {
+    if (e.target.closest?.("[data-sound]")) return;
+    if (Sound.enabled) Sound.unlock();
+    Sound.wake();
+  }, { passive: true, capture: true }));
 
+// The mute button. Muting is remembered on this device, through sign-outs and reloads.
 function soundButton(container) {
   const btn = document.createElement("button");
-  btn.className = "sound-btn";
+  btn.className = "icon-btn";
   btn.type = "button";
+  btn.dataset.sound = "";
   const paint = () => {
-    btn.textContent = Sound.ready() ? "🔔 Test siren" : "🔕 Enable sound";
-    btn.title = Sound.ready() ? "Sound alerts are on" : "Tap so new orders and alerts can make a sound";
-    btn.classList.toggle("off", !Sound.ready());
+    const on = Sound.enabled;
+    btn.innerHTML = on ? ICONS.soundOn : ICONS.soundOff;
+    const label = !on ? "Alarm is muted. Tap to turn it back on."
+      : Sound.ready() ? "Alarm is on. Tap to mute it." : "Tap anywhere to allow the alarm";
+    btn.title = label;
+    btn.setAttribute("aria-label", label);
+    btn.setAttribute("aria-pressed", String(!on));
+    btn.classList.toggle("off", !on);
   };
-  btn.onclick = () => { Sound.unlock(); setTimeout(() => { paint(); Sound.play("alert"); }, 50); };
+  btn.onclick = () => {
+    const needsPermission = Sound.enabled && !Sound.ready();
+    if (Sound.enabled && !needsPermission) {
+      Sound.setEnabled(false);
+      toast("Alarm muted. You'll still see alerts on screen.");
+    } else {
+      Sound.setEnabled(true);
+      Sound.unlock();
+      setTimeout(() => Sound.play("info"), 50);  // a short sound, so you know it works
+      toast("Alarm is on.", "good");
+    }
+    paint();
+  };
   paint();
+  for (const ev of ["pointerup", "keyup"]) document.addEventListener(ev, () => setTimeout(paint, 100), { passive: true });
   container.appendChild(btn);
   return btn;
 }
+
+// Every password box gets an eye button to check what's been typed.
+function addPasswordEyes() {
+  document.querySelectorAll('input[type="password"]').forEach((input) => {
+    const wrap = document.createElement("div");
+    wrap.className = "pw-wrap";
+    input.replaceWith(wrap);
+    wrap.appendChild(input);
+    const eye = document.createElement("button");
+    eye.type = "button";
+    eye.className = "icon-btn pw-eye";
+    const paint = () => {
+      const shown = input.type === "text";
+      eye.innerHTML = shown ? ICONS.eyeOff : ICONS.eye;
+      eye.setAttribute("aria-label", shown ? "Hide password" : "Show password");
+      eye.setAttribute("aria-pressed", String(shown));
+    };
+    eye.onclick = () => { input.type = input.type === "text" ? "password" : "text"; paint(); };
+    // hidden again on sending, so browsers offer to save it as a password
+    input.form?.addEventListener("submit", () => { input.type = "password"; paint(); });
+    paint();
+    wrap.appendChild(eye);
+  });
+}
+addPasswordEyes();
 
 // ---------------------------------------------------------------- maps
 const MAP_TILES = "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png";

@@ -36,7 +36,8 @@ class ProductRead(ProductBase, ReadModel):
     @property
     def discount_percent(self) -> int | None:
         if self.compare_at_price and self.compare_at_price > self.price:
-            return int((self.compare_at_price - self.price) / self.compare_at_price * 100)
+            # the half allows for sale prices being rounded to whole naira: 15% off 1,001 stays "15%"
+            return int((float(self.compare_at_price - self.price) + 0.5) / float(self.compare_at_price) * 100)
         return None
 
 
@@ -83,6 +84,14 @@ class ProductUpdate(SQLModel):
     image_url: str | None = None
     is_featured: bool | None = None
     is_active: bool | None = None
+
+
+class DiscountApply(SQLModel):
+    """Percentage off the normal price (0 ends the discount). Applies to `product_ids`,
+    or to `category_id`, or to every product when neither is given."""
+    percent: int = Field(ge=0, le=90)
+    product_ids: list[uuid.UUID] | None = None
+    category_id: uuid.UUID | None = None
 
 
 class StockAdjust(SQLModel):

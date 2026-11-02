@@ -2,7 +2,7 @@
 and the admin live board (/dashboard). Plain HTML + JS that call the /api/v1 endpoints."""
 from pathlib import Path
 
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 from fastapi.responses import FileResponse, RedirectResponse
 
 WEB = Path(__file__).resolve().parent.parent / "web"
@@ -42,6 +42,13 @@ async def rider_service_worker():
 @router.get("/rider/manifest.webmanifest")
 async def rider_manifest():
     return _page(WEB / "rider" / "manifest.webmanifest", "application/manifest+json")
+
+
+@router.get("/rider/{name}.png")
+async def rider_png(name: str):
+    if name not in ("icon-192", "icon-512", "icon-maskable-512", "apple-touch-icon"):
+        raise HTTPException(status_code=404)
+    return _page(WEB / "rider" / f"{name}.png", "image/png")
 
 
 @router.get("/rider/icon.svg")

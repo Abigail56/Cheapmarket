@@ -1,0 +1,86 @@
+@import "tailwindcss";
+
+/* Cheapmarketdeal palette: deep forest green on white, muted rust for deals */
+@theme {
+  --color-brand-50: #f2f6f4;
+  --color-brand-100: #e0e9e4;
+  --color-brand-200: #c2d3ca;
+  --color-brand-300: #97b3a4;
+  --color-brand-400: #648d78;
+  --color-brand-500: #3f6f58;
+  --color-brand-600: #1f5540;
+  --color-brand-700: #184634;
+  --color-brand-800: #13392b;
+  --color-brand-900: #0f2d22;
+  --color-brand-950: #07170f;
+
+  --color-deal-50: #fdf4f0;
+  --color-deal-100: #f9e4da;
+  --color-deal-500: #c8501f;
+  --color-deal-600: #b4431a;
+  --color-deal-700: #933616;
+
+  --font-sans: var(--font-geist), ui-sans-serif, system-ui, sans-serif;
+
+  /* Across every page: gently rounded corners, no extra-heavy text */
+  --radius-lg: 0.5rem;
+  --radius-xl: 0.625rem;
+  --radius-2xl: 0.875rem;
+  --radius-3xl: 1.25rem;
+  --font-weight-bold: 600;
+  --font-weight-extrabold: 600;
+}
+
+:root {
+  color-scheme: light;
+}
+
+body {
+  background: var(--color-white);
+  color: var(--color-slate-900);
+}
+
+h1,
+h2 {
+  letter-spacing: -0.02em;
+}
+
+/* Shared building blocks (declared as utilities so they can be combined with @apply) */
+@utility container-page {
+  @apply mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8;
+}
+@utility card {
+  @apply rounded-2xl border border-slate-200/70 bg-white shadow-sm;
+}
+@utility btn {
+  @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-medium transition
+    focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600
+    disabled:cursor-not-allowed disabled:opacity-60;
+}
+@utility btn-primary {
+  @apply btn bg-brand-600 text-white hover:bg-brand-700;
+}
+@utility btn-secondary {
+  @apply btn border border-slate-300 bg-white text-slate-800 hover:border-brand-500 hover:text-brand-700;
+}
+@utility btn-ghost {
+  @apply btn text-slate-700 hover:bg-slate-100;
+}
+@utility btn-danger {
+  @apply btn border border-red-200 bg-white text-red-700 hover:bg-red-50;
+}
+@utility input {
+  @apply block w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-slate-900
+    placeholder:text-slate-400 focus:border-brand-500 focus:ring-2 focus:ring-brand-200 focus:outline-none
+    disabled:bg-slate-50;
+}
+@utility label {
+  @apply mb-1.5 block text-sm font-medium text-slate-700;
+}
+@utility link {
+  @apply font-medium text-brand-700 underline-offset-2 hover:underline;
+}
+
+.auth-footer a {
+  color: var(--color-amber-300);
+}

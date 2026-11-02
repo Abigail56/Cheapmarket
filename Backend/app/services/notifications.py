@@ -104,7 +104,7 @@ async def _send_email(to: str, subject: str, text: str) -> None:
 
 # ------------------------------ message templates -----------------------------
 OrderEvent = Literal["placed", "paid", "confirmed", "out_for_delivery", "delivered", "cancelled",
-                     "rider_accepted", "rider_arrived"]
+                     "rider_accepted", "rider_arrived", "delivery_failed"]
 
 _ORDER_TEXT: dict[str, str] = {
     "placed": "Thanks for your order {n} ({total}). Track it here: {link}",
@@ -113,8 +113,9 @@ _ORDER_TEXT: dict[str, str] = {
     "out_for_delivery": "Your order {n} is on its way to you. Watch the rider live: {link}",
     "delivered": "Your order {n} has been delivered. Enjoy, and thanks for shopping with us!",
     "cancelled": "Your order {n} has been cancelled. Questions? Just reply or call us.",
+    "delivery_failed": "We couldn't complete the delivery of order {n} just now. We'll be in touch shortly to sort it out.",
     "rider_accepted": "{rider} is your rider for order {n}. Track it live: {link}",
-    "rider_arrived": "Your rider has arrived with order {n}. They will ask for the delivery code we text you.",
+    "rider_arrived": "Your rider has arrived with order {n}. We'll text you a delivery code to type on their phone once you have your items.",
 }
 _ORDER_SUBJECT: dict[str, str] = {
     "placed": "We received your order {n}",
@@ -123,6 +124,7 @@ _ORDER_SUBJECT: dict[str, str] = {
     "out_for_delivery": "Order {n} is on its way",
     "delivered": "Order {n} delivered",
     "cancelled": "Order {n} cancelled",
+    "delivery_failed": "A problem with delivering order {n}",
     "rider_accepted": "A rider is bringing order {n}",
     "rider_arrived": "Your rider has arrived with {n}",
 }
@@ -139,11 +141,23 @@ def tracking_url(order: Order) -> str:
     return f"{settings.PUBLIC_BASE_URL.rstrip('/')}/track/{order.tracking_token}"
 
 
+async def admin_new_order(order: Order) -> None:
+    """Tells the staff listed in ADMIN_ALERT_PHONES / ADMIN_ALERT_EMAILS about a new order."""
+    method = {"cod": "pay on delivery", "card": "card (payment may not be finished yet)",
+              "transfer": "bank transfer"}.get(order.payment_method.value, order.payment_method.value)
+    text = (f"New order {order.order_number}: {settings.CURRENCY} {q2(order.total):,}, {method}. "
+            f"Customer: {order.customer_name}.")
+    for phone in filter(None, (p.strip() for p in settings.ADMIN_ALERT_PHONES.split(","))):
+        await enqueue("sms", phone, f"Cheapmarket: {text}")
+    for email in filter(None, (e.strip() for e in settings.ADMIN_ALERT_EMAILS.split(","))):
+        await enqueue("email", email, text, subject=f"New order {order.order_number}")
+
+
 async def order_event(order: Order, event: OrderEvent, **extra: str) -> None:
     fmt = {"n": order.order_number, "total": f"{settings.CURRENCY} {q2(order.total):,}",
            "link": tracking_url(order), **extra}
     text = _ORDER_TEXT[event].format(**fmt)
-    await enqueue("sms", order.customer_phone, f"Cheapmarketdeal: {text}")
+    await enqueue("sms", order.customer_phone, f"Cheapmarket: {text}")
     if order.customer_email:
         await enqueue("email", order.customer_email, text,
                       subject=_ORDER_SUBJECT[event].format(**fmt))
@@ -158,5 +172,5 @@ async def push_rider(rider_id, title: str, body: str, *, tag: str, url: str = "/
 async def send_code(channel: Channel, to: str, code: str, purpose: str) -> None:
     minutes = settings.OTP_TTL_SECONDS // 60
     what = {"reset": "reset your password", "phone": "verify your phone number"}[purpose]
-    text = f"Your Cheapmarketdeal code is {code}. Use it to {what}. It expires in {minutes} minutes."
-    await enqueue(channel, to, text, subject="Your Cheapmarketdeal code")
+    text = f"Your Cheapmarket code is {code}. Use it to {what}. It expires in {minutes} minutes."
+    await enqueue(channel, to, text, subject="Your Cheapmarket code")

@@ -5,6 +5,7 @@ from app.models.category import Category
 from app.models.coupon import Coupon, DiscountType
 from app.models.delivery import Delivery, DeliveryStatus
 from app.models.delivery_zone import DeliveryZone
+from app.models.notification import Notification
 from app.models.order import (
     Order,
     OrderItem,
@@ -42,6 +43,7 @@ __all__ = [
     "DocumentKind",
     "IdCheckStatus",
     "IdType",
+    "Notification",
     "Order",
     "OrderItem",
     "OrderStatus",

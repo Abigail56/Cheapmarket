@@ -1,14 +1,32 @@
 {
-  "name": "Cheapmarketdeal Rider",
-  "short_name": "CMD Rider",
+  "name": "Cheapmarket Rider",
+  "short_name": "Cheapmarket",
   "description": "Accept deliveries, navigate, and hand over with a delivery code.",
   "start_url": "/rider/",
   "scope": "/rider/",
   "display": "standalone",
   "orientation": "portrait",
-  "background_color": "#f6f7f5",
-  "theme_color": "#1f8a4c",
+  "background_color": "#fbf8f1",
+  "theme_color": "#1c7946",
   "icons": [
-    { "src": "/rider/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
-  ]
+    {
+      "src": "/rider/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/rider/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/rider/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "id": "/rider/"
 }

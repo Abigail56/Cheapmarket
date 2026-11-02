@@ -5,41 +5,88 @@
   <meta name="referrer" content="strict-origin-when-cross-origin">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="robots" content="noindex">
-  <title>Live deliveries · Cheapmarketdeal</title>
+  <title>Live deliveries · Cheapmarket</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
         integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
   <link rel="icon" href="/rider/icon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap">
   <link rel="stylesheet" href="/static/common.css">
   <style>
-    .grid { display: grid; gap: 14px; grid-template-columns: 380px 1fr; align-items: start; }
-    @media (max-width: 900px) { .grid { grid-template-columns: 1fr; } }
-    .item { border-top: 1px solid var(--line); padding: 12px 0; }
+    .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 14px; }
+    .stat { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 14px 16px; box-shadow: var(--shadow); }
+    .stat b { display: block; font-size: 28px; font-weight: 800; line-height: 1.1; font-variant-numeric: tabular-nums; }
+    .stat span { font-size: 14px; color: var(--muted); }
+    .stat.hot b { color: var(--deal); }
+    @media (max-width: 700px) { .stats { grid-template-columns: repeat(2, 1fr); } }
+    .grid { display: grid; gap: 14px; grid-template-columns: minmax(340px, 420px) minmax(0, 1fr); align-items: start; }
+    @media (max-width: 900px) { .grid { grid-template-columns: minmax(0, 1fr); } }
+    .item { border-top: 1px solid var(--line); padding: 12px 8px; margin: 0 -8px; border-radius: 10px; }
     .item:first-of-type { border-top: 0; }
     .item .row { gap: 6px; }
+    .item .row.top { justify-content: space-between; }
+    .item .row.top > * { flex: 0 1 auto; }
     .feed { max-height: 320px; overflow: auto; font-size: 14px; }
-    .feed div { padding: 6px 0; border-top: 1px solid var(--line); }
+    .feed div { padding: 7px 0; border-top: 1px solid var(--line); }
+    .feed div:first-child { border-top: 0; }
     .feed .alert { color: var(--bad); font-weight: 600; }
     .feed .good { color: var(--good); font-weight: 600; }
-    .count { background: var(--brand); color: var(--brand-ink); border-radius: 999px; padding: 0 8px; font-size: 13px; margin-left: 6px; }
-    .count.zero { background: var(--chip); color: var(--muted); }
+    .count { background: var(--chip); color: var(--muted); border-radius: 999px; padding: 1px 9px; font-size: 13px; margin-left: 4px; font-weight: 700; }
+    .count.zero { display: none; }
+    .journey { list-style: none; display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; padding: 0; margin: 10px 0 8px; font-size: 12px; color: var(--muted); }
+    .journey li::before { content: ""; display: block; height: 5px; border-radius: 999px; background: var(--line); margin-bottom: 4px; }
+    .journey b { display: block; font-weight: 600; }
+    .journey .done { color: var(--text); }
+    .journey .done::before { background: var(--brand); }
+    .journey .now b { font-weight: 800; }
+    .journey .now::before { background: var(--deal); }
+    .proofs { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; }
+    .proof-tile { font-size: 13px; line-height: 1.35; color: var(--muted); }
+    .proof-tile a { display: block; margin-bottom: 6px; }
+    .proof-tile img, .no-photo { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; border-radius: 12px; display: grid; place-items: center; background: var(--chip); }
+    .proof-tile strong { display: block; color: var(--text); }
     .docs { display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
     .doc { display: flex; flex-direction: column; align-items: center; gap: 4px; width: 96px; min-height: 0;
            padding: 6px; border-radius: 10px; background: var(--chip); color: var(--text); font-size: 12px; font-weight: 600; }
     .reasons { margin: 6px 0 0; padding-left: 18px; font-size: 13px; color: var(--muted); }
     .reasons li { margin: 2px 0; }
     .doc img { width: 84px; height: 64px; object-fit: cover; border-radius: 6px; }
+    .views { display: flex; gap: 8px; margin-bottom: 14px; flex-wrap: wrap; }
+    .views button { flex: 0 1 auto; }
+    .sale-fields { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); gap: 12px; }
+    .product { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; padding: 12px 0; border-top: 1px solid var(--line); }
+    .product img, .no-image { width: 72px; height: 72px; flex: none; object-fit: cover; border-radius: 12px; background: var(--chip); }
+    .no-image { display: grid; place-items: center; text-align: center; font-size: 12px; color: var(--muted); }
+    .product-info { flex: 1 1 220px; min-width: 0; }
+    .product-price { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 2px; }
+    .product-price b { font-size: 17px; }
+    .product-actions { flex: 0 0 auto; }
+    .product-filters { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); gap: 10px; margin: 10px 0 4px; }
+    .product-dialog { width: min(520px, calc(100vw - 24px)); }
+    .form-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    label.check { display: flex; gap: 10px; align-items: center; font-weight: 500; }
+    label.check input { width: auto; flex: none; }
+    @media (max-width: 600px) { .sale-fields, .product-filters { grid-template-columns: minmax(0, 1fr); } }
+    .order-alarm { position: sticky; top: 8px; z-index: 30; display: flex; flex-wrap: wrap; gap: 10px 14px; align-items: center; justify-content: space-between;
+                   margin-bottom: 14px; padding: 14px 16px; border-radius: 14px; background: #b42318; color: #fff; font-weight: 700; font-size: 17px;
+                   box-shadow: 0 8px 24px rgba(180, 35, 24, .35); animation: order-alarm 1s ease-in-out infinite; }
+    .order-alarm button { flex: none; background: #fff; color: #b42318; font-weight: 800; }
+    .order-alarm button:hover { background: #fee4e2; }
+    @keyframes order-alarm { 50% { background: #7a1a12; } }
+    @media (prefers-reduced-motion: reduce) { .order-alarm { animation: none; } }
   </style>
 </head>
 <body>
   <header class="bar">
-    <h1><span class="brand">Cheapmarketdeal</span> · Live deliveries</h1>
-    <span id="live" class="status-dot" title="Live connection"></span>
+    <h1><span class="brand">Cheapmarket</span> <span class="sub">Admin</span> <span id="live" class="status-dot" title="Live connection"></span></h1>
     <span id="sound"></span>
-    <button id="logout" class="small secondary hidden" type="button">Log out</button>
+    <div id="bell" class="hidden"></div>
+    <button id="logout" class="small quiet hidden" type="button">Sign out</button>
   </header>
   <main class="wide">
     <section id="login" class="card hidden" style="max-width:420px;margin:40px auto">
-      <h2>Admin sign in</h2>
+      <h2>Welcome back</h2>
+      <p class="muted">Sign in to see today's orders and riders.</p>
       <form id="login-form" class="stack">
         <div><label for="email">Email</label><input id="email" type="email" autocomplete="username" required></div>
         <div><label for="password">Password</label><input id="password" type="password" autocomplete="current-password" required></div>
@@ -48,21 +95,105 @@
       <div class="or hidden" id="or-login">or</div>
       <div id="google-login" class="google-btn hidden"></div>
     </section>
-    <section id="app" class="grid hidden">
-      <div>
-        <div class="card hidden" id="apps-card"><h2>Rider applications <span id="n-apps" class="count"></span></h2><div id="apps"></div></div>
-        <div class="card"><h2>Needs a rider <span id="n-waiting" class="count"></span></h2><div id="waiting"></div></div>
-        <div class="card"><h2>In progress <span id="n-active" class="count"></span></h2><div id="active"></div></div>
+    <section id="app" class="hidden">
+      <div id="order-alarm" class="order-alarm hidden" role="alert">
+        <span id="order-alarm-text"></span>
+        <button type="button" id="order-alarm-stop">Stop alarm</button>
       </div>
-      <div>
-        <div class="card"><h2>Riders on the map</h2><div id="map" class="map tall"></div><div id="riders" class="muted"></div></div>
-        <div class="card"><h2>Live feed</h2><div id="feed" class="feed"><p class="muted" id="feed-empty">Waiting for events: new orders, riders accepting, deliveries…</p></div></div>
+      <p id="alarm-sound-note" class="banner warn hidden" role="status"></p>
+      <nav class="views" aria-label="Admin sections">
+        <button type="button" data-view="deliveries" aria-pressed="true">Deliveries</button>
+        <button type="button" class="secondary" data-view="products" aria-pressed="false">Products &amp; prices</button>
+        <button type="button" class="secondary" data-view="categories" aria-pressed="false">Categories</button>
+        <button type="button" class="secondary" data-view="zones" aria-pressed="false">Delivery areas</button>
+        <button type="button" class="secondary" data-view="coupons" aria-pressed="false">Coupons</button>
+      </nav>
+      <div id="view-products" class="hidden">
+        <div class="card">
+          <h2>Discount many products</h2>
+          <p class="muted">Type 10 to take 10% off the normal price. A new discount replaces the old one, and you can end it at any time.</p>
+          <form id="sale-form">
+            <div class="sale-fields">
+              <div><label for="sale-scope">Which products?</label><select id="sale-scope"></select></div>
+              <div><label for="sale-percent">Discount (%)</label><input id="sale-percent" type="number" min="1" max="90" step="1" inputmode="numeric" placeholder="10"></div>
+            </div>
+            <div class="row tight mt">
+              <button type="submit">Apply discount</button>
+              <button type="button" class="secondary" id="sale-end">End discount</button>
+            </div>
+          </form>
+        </div>
+        <div class="card">
+          <div class="between">
+            <h2>Products <span id="n-products" class="count"></span></h2>
+            <button type="button" class="small" id="product-add">Add a product</button>
+          </div>
+          <div class="product-filters">
+            <input id="product-search" type="search" placeholder="Search by name" aria-label="Search products">
+            <select id="product-category" aria-label="Filter by category"></select>
+          </div>
+          <div id="product-list"><p class="muted">Loading…</p></div>
+        </div>
+      </div>
+      <div id="view-categories" class="hidden">
+        <div class="card">
+          <div class="between">
+            <h2>Categories <span id="n-categories" class="count"></span></h2>
+            <button type="button" class="small" id="category-add">Add a category</button>
+          </div>
+          <p class="muted">These are the groups customers browse in the shop. To remove one, first edit its products to move them to another category.</p>
+          <div id="category-list"><p class="muted">Loading…</p></div>
+        </div>
+      </div>
+      <div id="view-zones" class="hidden">
+        <div class="card">
+          <div class="between">
+            <h2>Delivery areas <span id="n-zones" class="count"></span></h2>
+            <button type="button" class="small" id="zone-add">Add an area</button>
+          </div>
+          <p class="muted">Customers choose one of these at checkout, and it sets their delivery fee. Orders already placed keep the fee they paid.</p>
+          <div id="zone-list"><p class="muted">Loading…</p></div>
+        </div>
+      </div>
+      <div id="view-coupons" class="hidden">
+        <div class="card">
+          <div class="between">
+            <h2>Coupons <span id="n-coupons" class="count"></span></h2>
+            <button type="button" class="small" id="coupon-add">Add a coupon</button>
+          </div>
+          <p class="muted">Customers type a code at checkout to get money off their order. Turn a coupon off at any time to stop it working.</p>
+          <div id="coupon-list"><p class="muted">Loading…</p></div>
+        </div>
+      </div>
+      <div id="view-deliveries">
+      <div class="stats">
+        <div class="stat" id="s-new"><b></b><span>New orders</span></div>
+        <div class="stat" id="s-waiting"><b></b><span>Need a rider</span></div>
+        <div class="stat" id="s-active"><b></b><span>Out with riders</span></div>
+        <div class="stat" id="s-free"><b></b><span>Riders free</span></div>
+      </div>
+      <div class="grid">
+        <div>
+          <div class="card hidden" id="apps-card"><h2>People who want to ride <span id="n-apps" class="count"></span></h2><div id="apps"></div></div>
+          <div class="card"><h2>New orders <span id="n-new" class="count"></span></h2><div id="new-orders"></div></div>
+          <div class="card"><h2>Need a rider <span id="n-waiting" class="count"></span></h2><div id="waiting"></div></div>
+          <div class="card"><h2>Out with riders <span id="n-active" class="count"></span></h2><div id="active"></div></div>
+        </div>
+        <div>
+          <div class="card"><h2>Where everyone is</h2><div id="map" class="map tall"></div><div id="riders" class="muted"></div></div>
+          <div class="card"><h2>Just delivered</h2><p class="muted">The photo each rider took at the door.</p><div id="delivered" class="proofs mt"></div></div>
+          <div class="card"><h2>What's been happening</h2><div id="feed" class="feed"><p class="muted" id="feed-empty">Things will appear here as they happen while this page is open.</p></div></div>
+        </div>
+      </div>
       </div>
     </section>
   </main>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
           integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
   <script src="/static/common.js"></script>
+  <script src="/static/alarm.js"></script>
   <script src="/static/dashboard.js"></script>
+  <script src="/static/products.js"></script>
+  <script src="/static/store.js"></script>
 </body>
 </html>

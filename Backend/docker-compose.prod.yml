@@ -5,7 +5,8 @@
 #
 # Differences from the development docker-compose.yml:
 # - code is baked into the image (no live reload, no folder mounted over it)
-# - only Caddy is reachable from outside (ports 80/443, automatic HTTPS for $DOMAIN);
+# - only Caddy is reachable from outside (ports 80/443, automatic HTTPS for the API at
+#   $DOMAIN and the shop at $SHOP_DOMAIN);
 #   Postgres, Redis and the API itself are on the internal network only
 # - Redis requires REDIS_PASSWORD
 # - migrations run once in their own container before the API starts
@@ -70,16 +71,34 @@ services:
       migrate: { condition: service_completed_successfully }
       redis: { condition: service_healthy }
 
-  # HTTPS in front of the API. Point your domain's DNS at this server first:
+  # The customer shop (../Frontend). Browsers call the API at https://$DOMAIN; the shop's
+  # own server reads the catalogue over the internal network
+  web:
+    build:
+      context: ../Frontend
+      args:
+        NEXT_PUBLIC_API_URL: https://${DOMAIN:?set DOMAIN in .env}
+        NEXT_PUBLIC_PAYMENT_PROVIDER: ${PAYMENT_PROVIDER:-paystack}
+        NEXT_PUBLIC_SUPPORT_PHONE: ${SUPPORT_PHONE:-}
+        NEXT_PUBLIC_SUPPORT_EMAIL: ${SUPPORT_EMAIL:-}
+    image: cheapmarketdeal-web:prod
+    environment:
+      API_INTERNAL_URL: http://api:8000
+    restart: unless-stopped
+    depends_on: [api]
+
+  # HTTPS in front of the API and the shop. Point your domain's DNS at this server first:
   # Caddy then gets and renews the certificate by itself
   caddy:
     image: caddy:2-alpine
     environment:
-      DOMAIN: ${DOMAIN:?set DOMAIN in .env}  # Caddy needs only this, not the app's secrets
+      # Caddy needs only these, not the app's secrets
+      DOMAIN: ${DOMAIN:?set DOMAIN in .env}
+      SHOP_DOMAIN: ${SHOP_DOMAIN:?set SHOP_DOMAIN in .env}
     ports: ["80:80", "443:443", "443:443/udp"]
     volumes: ["./Caddyfile:/etc/caddy/Caddyfile:ro", "caddydata:/data", "caddyconfig:/config"]
     restart: unless-stopped
-    depends_on: [api]
+    depends_on: [api, web]
 
   # Nightly pg_dump into ./backups (see scripts/backup.sh). Copy that folder off
   # the server too: a backup on the same disk dies with the disk.

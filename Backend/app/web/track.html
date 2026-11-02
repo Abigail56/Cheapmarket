@@ -4,58 +4,97 @@
   <meta charset="utf-8">
   <meta name="referrer" content="strict-origin-when-cross-origin">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#1f8a4c">
+  <meta name="theme-color" content="#1c7946">
   <meta name="robots" content="noindex">
-  <title>Track your order · Cheapmarketdeal</title>
+  <title>Track your order · Cheapmarket</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
         integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
   <link rel="icon" href="/rider/icon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap">
   <link rel="stylesheet" href="/static/common.css">
   <style>
-    .steps { list-style: none; padding: 0; margin: 8px 0 0; }
-    .steps li { display: flex; gap: 10px; align-items: center; padding: 6px 0; color: var(--muted); }
-    .steps li::before { content: ""; width: 12px; height: 12px; border-radius: 50%; border: 2px solid var(--line); flex: none; }
+    .hero h2 { font-size: 25px; line-height: 1.2; letter-spacing: -.02em; margin: 10px 0 4px; }
+    .hero .lead { color: var(--muted); margin: 0; }
+    .eta { font-size: 15px; font-weight: 700; color: var(--brand); margin-top: 8px; }
+    .steps { list-style: none; padding: 0; margin: 0; }
+    .steps li { position: relative; display: flex; justify-content: space-between; gap: 12px; padding: 0 0 18px 30px; color: var(--muted); }
+    .steps li:last-child { padding-bottom: 0; }
+    .steps li::before { content: ""; position: absolute; left: 0; top: 4px; width: 16px; height: 16px; border-radius: 50%; border: 2px solid var(--line); background: var(--card); z-index: 1; }
+    .steps li::after { content: ""; position: absolute; left: 7px; top: 8px; bottom: -6px; width: 2px; background: var(--line); }
+    .steps li:last-child::after { display: none; }
     .steps li.done { color: var(--text); }
     .steps li.done::before { background: var(--brand); border-color: var(--brand); }
+    .steps li.done::after { background: var(--brand); }
     .steps li.now { font-weight: 700; color: var(--text); }
-    .steps li.now::before { background: var(--warn); border-color: var(--warn); }
-    .eta { font-size: 28px; font-weight: 800; }
+    .steps li.now::before { border-color: var(--deal); box-shadow: 0 0 0 4px var(--deal-soft); }
+    .steps time { font-size: 13px; color: var(--muted); font-weight: 500; white-space: nowrap; }
+    .person { display: flex; align-items: center; gap: 12px; }
+    .avatar { width: 46px; height: 46px; border-radius: 50%; display: grid; place-items: center; background: var(--brand-soft); color: var(--brand); font-weight: 800; font-size: 18px; flex: none; }
+    .person h2 { margin: 0; }
+    .code-card { background: var(--deal-soft); border-color: transparent; }
+    .code-card h2 { color: var(--deal); }
+    .proof { width: 100%; max-height: 340px; object-fit: cover; border-radius: 14px; display: block; margin-top: 10px; }
   </style>
 </head>
 <body>
   <header class="bar">
-    <h1><span class="brand">Cheapmarketdeal</span> · Track order</h1>
+    <h1><span class="brand">Cheapmarket</span></h1>
     <span id="live" class="status-dot" title="Live updates"></span>
+    <span id="sound"></span>
   </header>
   <main>
     <div id="error" class="banner bad hidden"></div>
     <section id="view" class="hidden">
-      <div class="card">
-        <div class="row"><h2 id="number"></h2><span id="status" class="chip"></span></div>
-        <div id="eta" class="hidden"><div class="eta" id="eta-text"></div><div class="muted" id="seen"></div></div>
-        <ol class="steps" id="steps"></ol>
+      <div class="card hero">
+        <div class="between"><span class="muted">Order <strong id="number"></strong></span><span id="status" class="chip"></span></div>
+        <h2 id="headline"></h2>
+        <p class="lead" id="lead"></p>
+        <div class="eta hidden" id="eta"></div>
       </div>
+
+      <div class="card code-card hidden" id="code-card" aria-live="polite">
+        <h2 id="code-title"></h2>
+        <p id="code-text"></p>
+      </div>
+
+      <div class="card hidden" id="proof-card">
+        <h2>Here's your delivery</h2>
+        <p class="muted">Your rider took this photo when they handed it over.</p>
+        <a id="proof-link" target="_blank" rel="noopener"><img id="proof" class="proof" alt="Photo of your delivered order"></a>
+      </div>
+
       <div class="card hidden" id="rider-card">
-        <h2 id="rider-line"></h2>
+        <div class="person">
+          <div class="avatar" id="avatar" aria-hidden="true"></div>
+          <div><h2 id="rider-line"></h2><div class="muted" id="seen"></div></div>
+        </div>
         <div class="map" id="map"></div>
-        <a id="call" class="btn secondary hidden" href="#">📞 Call your rider</a>
+        <a id="call" class="btn secondary full hidden" href="#">Call your rider</a>
       </div>
+
+      <div class="card">
+        <h2>Your order's journey</h2>
+        <ol class="steps mt" id="steps"></ol>
+      </div>
+
       <div class="card hidden" id="address-card">
-        <h2>Delivery address</h2>
+        <h2>Where we're delivering</h2>
         <p id="address"></p>
         <p class="muted" id="landmark"></p>
         <form id="address-form" class="stack hidden">
-          <p class="muted">Help the rider find you. You can change this until the rider sets off.</p>
-          <div><label for="lm">Landmark</label><input id="lm" maxlength="255" placeholder="e.g. Blue gate opposite the church"></div>
-          <div><label for="nt">Notes for the rider</label><input id="nt" maxlength="500" placeholder="e.g. Call me at the gate"></div>
-          <button type="button" class="secondary" id="pin-me">📍 Use my current location as the drop-off point</button>
-          <button type="submit">Save</button>
+          <p class="muted">Anything that helps your rider find you? You can change this until they set off.</p>
+          <div><label for="lm">A landmark nearby</label><input id="lm" maxlength="255" placeholder="Blue gate, opposite the church"></div>
+          <div><label for="nt">A note for your rider</label><input id="nt" maxlength="500" placeholder="Please call me at the gate"></div>
+          <button type="button" class="secondary full" id="pin-me">I'm at the address, use my location</button>
+          <button type="submit" class="full">Save</button>
         </form>
       </div>
+
       <div class="card">
-        <h2>Your order</h2>
+        <h2>What's in your order</h2>
         <p id="items"></p>
-        <p><strong id="total"></strong> · <span id="payment" class="muted"></span></p>
+        <div class="between mt"><strong id="total"></strong><span id="payment" class="muted"></span></div>
       </div>
     </section>
   </main>

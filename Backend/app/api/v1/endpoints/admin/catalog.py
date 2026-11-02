@@ -1,4 +1,5 @@
 import uuid
+from decimal import ROUND_HALF_UP, Decimal
 from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, Query, UploadFile, status
@@ -13,6 +14,7 @@ from app.schemas.catalog import (
     CategoryCreate,
     CategoryRead,
     CategoryUpdate,
+    DiscountApply,
     ProductAdminRead,
     ProductCreate,
     ProductUpdate,
@@ -74,7 +76,7 @@ async def delete_category(category_id: uuid.UUID, admin: AdminUser, session: Ses
     _, count = await catalog_repo.search_products(session, category_ids=[cat.id],
                                                   active_only=False, limit=1)
     if count:
-        raise Conflict("Move or delete this category's products first", code="category_in_use")
+        raise Conflict("Move this category's products to another category first", code="category_in_use")
     audit.record(session, admin, "category.delete", cat, changes=audit.snapshot(cat))
     await session.delete(cat)
     await session.commit()
@@ -149,6 +151,38 @@ async def update_product(product_id: uuid.UUID, data: ProductUpdate, admin: Admi
     await session.refresh(product)
     await invalidate_catalog_cache()
     return product
+
+
+@router.post("/products/discount")
+async def apply_discount(data: DiscountApply, admin: AdminUser, session: SessionDep) -> dict[str, int]:
+    """Puts products on sale by percentage, always worked out from the normal price, so a
+    new discount replaces the old one instead of stacking. `percent: 0` ends the discount."""
+    from sqlmodel import select
+
+    query = select(Product)
+    if data.product_ids is not None:
+        query = query.where(Product.id.in_(data.product_ids))
+    if data.category_id:
+        query = query.where(Product.category_id == data.category_id)
+    rows = (await session.exec(query.with_for_update())).all()
+    updated = 0
+    for product in rows:
+        normal = max(product.price, product.compare_at_price or product.price)
+        if normal <= 0:
+            continue
+        before = audit.snapshot(product, ["price", "compare_at_price"])
+        if data.percent:
+            product.compare_at_price = normal
+            product.price = (normal * (100 - data.percent) / 100).quantize(Decimal(1), ROUND_HALF_UP)
+        else:
+            product.compare_at_price = None
+            product.price = normal
+        session.add(product)
+        audit.record(session, admin, "product.discount", product, changes=audit.diff(before, product))
+        updated += 1
+    await session.commit()
+    await invalidate_catalog_cache()
+    return {"updated": updated}
 
 
 @router.post("/products/{product_id}/stock", response_model=ProductAdminRead)

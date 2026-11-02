@@ -36,7 +36,7 @@ async def list_zones(_: AdminUser, session: SessionDep):
 @router.post("/zones", response_model=ZoneRead, status_code=status.HTTP_201_CREATED)
 async def create_zone(data: ZoneCreate, admin: AdminUser, session: SessionDep):
     if (await session.exec(select(DeliveryZone.id).where(DeliveryZone.name == data.name))).first():
-        raise Conflict("A zone with this name already exists")
+        raise Conflict("A delivery area with this name already exists")
     zone = DeliveryZone(**data.model_dump())
     session.add(zone)
     audit.record(session, admin, "zone.create", zone, changes=audit.snapshot(zone))
@@ -51,6 +51,9 @@ async def update_zone(zone_id: uuid.UUID, data: ZoneUpdate, admin: AdminUser, se
     if not zone:
         raise NotFound("Zone not found")
     changes = data.model_dump(exclude_unset=True)
+    if changes.get("name") and changes["name"] != zone.name and (await session.exec(
+            select(DeliveryZone.id).where(DeliveryZone.name == changes["name"]))).first():
+        raise Conflict("A delivery area with this name already exists")
     before = audit.snapshot(zone, list(changes))
     for k, v in changes.items():
         setattr(zone, k, v)

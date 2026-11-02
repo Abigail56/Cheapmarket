@@ -5,15 +5,14 @@ on:
     branches: [main]
   pull_request:
 
-# The API lives in Backend/; every step runs from there
-defaults:
-  run:
-    working-directory: Backend
-
 jobs:
+  # ---- API (Backend/) ----
   test:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: Backend
 
     services:
       postgres:
@@ -73,3 +72,29 @@ jobs:
       - name: Image builds
         run: docker build -t cheapmarketdeal-api:ci .
         working-directory: Backend
+
+  # ---- Shop (Frontend/) ----
+  web:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: Frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: Frontend/package-lock.json
+      - run: npm ci --no-audit --no-fund
+      - name: Lint
+        run: npm run lint
+      - name: Type check
+        run: npx next typegen && npx tsc --noEmit
+      - name: Build
+        run: npm run build
+        env:
+          NEXT_PUBLIC_API_URL: https://api.example.com
+      - name: Image builds
+        run: docker build --build-arg NEXT_PUBLIC_API_URL=https://api.example.com -t cheapmarketdeal-web:ci .

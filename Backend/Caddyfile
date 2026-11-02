@@ -1,5 +1,12 @@
-# Used by docker-compose.prod.yml. DOMAIN comes from .env (e.g. api.cheapmarketdeals.com).
-# Caddy gets the HTTPS certificate automatically and passes the real client IP on.
+# Used by docker-compose.prod.yml. DOMAIN and SHOP_DOMAIN come from .env.
+# Caddy gets the HTTPS certificates automatically and passes the real client IP on.
+
+# The API, rider app, live tracking pages and admin dashboard
 {$DOMAIN} {
 	reverse_proxy api:8000
+}
+
+# The customer shop
+{$SHOP_DOMAIN} {
+	reverse_proxy web:3000
 }

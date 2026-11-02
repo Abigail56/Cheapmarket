@@ -18,15 +18,17 @@ from redis.exceptions import RedisError
 
 from app.core.config import settings
 from app.db.redis import redis_client
+from app.services import inbox
 
 log = logging.getLogger(__name__)
 
 ADMIN = "events:admin"
+_RIDER_PREFIX = "events:rider:"
 MAXLEN = 1000  # each stream keeps roughly the last 1000 events
 
 
 def rider_stream(rider_id: uuid.UUID | str) -> str:
-    return f"events:rider:{rider_id}"
+    return f"{_RIDER_PREFIX}{rider_id}"
 
 
 def track_stream(order_id: uuid.UUID | str) -> str:
@@ -34,6 +36,10 @@ def track_stream(order_id: uuid.UUID | str) -> str:
 
 
 async def publish(streams: list[str], event: str, data: dict[str, Any]) -> None:
+    # the bell first, so a page that reloads on this event already finds the new line in it
+    await inbox.record(event, data, admins=ADMIN in streams,
+                       rider_ids=[s.removeprefix(_RIDER_PREFIX) for s in streams
+                                  if s.startswith(_RIDER_PREFIX)])
     payload = json.dumps(data, default=str)
     try:
         async with redis_client.pipeline(transaction=False) as pipe:

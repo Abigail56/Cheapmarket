@@ -34,7 +34,7 @@ Tests use real PostgreSQL + Redis (a separate `cmd_test` database and Redis DB 1
 ```bash
 docker compose up -d db redis
 docker compose exec db psql -U $POSTGRES_USER -c "CREATE DATABASE cmd_test;"
-uv sync && uv run pytest        # 184 tests
+uv sync && uv run pytest        # 209 tests
 ```
 
 CI (`.github/workflows/ci.yml`) runs lint, checks migrations apply and match the models, runs the tests and builds the Docker image on every push and pull request.
@@ -54,6 +54,7 @@ CI (`.github/workflows/ci.yml`) runs lint, checks migrations apply and match the
 | Checkout | `POST /checkout/quote · POST /orders · GET /orders · GET /orders/{no} · POST /orders/track · POST /orders/{no}/cancel` |
 | Payments | `POST /payments/initialize · GET /payments/verify/{ref} · POST /payments/webhook/paystack · /webhook/flutterwave` |
 | Rider | `GET /rider/deliveries · PATCH /rider/deliveries/{id}` |
+| Notification bell | `GET /notifications · POST /notifications/{id}/read · POST /notifications/read-all` |
 | Admin | `/admin/products · /categories · /orders · /zones · /coupons · /users · /dashboard · /audit-logs · POST /admin/uploads/images` |
 
 **Guests:** the first `POST /cart/items` returns a `session_id` (also in the `X-Cart-Session` response header). Send it back as the `X-Cart-Session` header on cart and checkout calls. After login, call `POST /cart/merge`.
@@ -82,21 +83,37 @@ CI (`.github/workflows/ci.yml`) runs lint, checks migrations apply and match the
 
 The customer gets an SMS (and an email, if they gave one) when the order is placed, paid, confirmed, out for delivery, delivered or cancelled.
 
+## Managing products without a developer
+
+Admins sign in at `/dashboard` and open **Products & prices** to add or edit products, upload photos, set stock, and put items on sale. A discount is a percentage off the normal price, on one product, one category or the whole shop. A new discount replaces the old one (they never stack), and ending it restores the normal price. Each change is recorded in the audit log.
+
+The **Categories** tab adds, renames and deletes categories (a category must be empty before it can be deleted), and **Delivery areas** sets each area's name, fee and free-delivery amount, and whether customers can choose it at checkout. **Coupons** creates discount codes and turns them on or off.
+
+## New-order alarm
+
+While `/dashboard` is open, a new order sets off a siren that repeats until someone taps **Stop alarm** or deals with the order. It also rings for orders placed while the page was closed or the connection was down. Browsers keep a page silent until it has been clicked once, so the page shows a reminder until then. A closed browser can't ring, so set `ADMIN_ALERT_PHONES` and/or `ADMIN_ALERT_EMAILS` to also send each new order by SMS or email.
+
 ## Riders, tracking and live dashboard
 
 Three pages are served by the API itself (plain HTML + JS, no build step):
 
 | Page | Who | What |
 |---|---|---|
-| `/rider/` | Riders | Installable phone app (PWA). Offers with a 5-minute accept countdown, address check with call button and GPS pin, navigation, live GPS, delivery code + handover photo. Chimes on new offers. |
-| `/track/<token>` | Customers | The link in their SMS. Status steps, the rider live on a map with ETA once on the way, call the rider, fix the landmark/pin until the rider leaves. |
-| `/dashboard` | Admins | Orders needing a rider (assign in one click), deliveries in progress, riders on a live map, event feed. Chimes on new orders, declines, expired offers, wrong codes, failures and deliveries. |
+| `/rider/` | Riders | Installable phone app (PWA). Offers with a 5-minute accept countdown, address check with call button and GPS pin, navigation, live GPS, delivery photo + delivery code. Notification bell. Chimes on new offers. |
+| `/track/<token>` | Customers | The link in their SMS (first when the order is placed, again when a rider accepts) and behind "Track your order live" in the shop. Status steps, the rider live on a map with ETA once on the way, call the rider, fix the landmark/pin until the rider leaves, and the delivery photo afterwards. |
+| `/dashboard` | Admins | New orders (confirm, or mark a transfer paid), orders needing a rider (assign in one click), deliveries in progress, riders on a live map, delivery photos, event feed, notification bell. Chimes on new orders, declines, expired offers, wrong codes, failures and deliveries. |
 
-**The journey:** admin assigns → rider accepts (or declines / doesn't answer in 5 min → back to the admin) → rider **confirms the address** (calls the customer, pins the door) → **Start journey** (order becomes *out for delivery*, customer gets the live link) → **I've arrived** (only within 300 m of the pin) → **Send delivery code** → customer reads the code, rider takes a **photo** and enters it → *delivered* (COD marked paid). Every step updates the order, the customer's page and the dashboard live.
+**The journey:** admin assigns → rider accepts (or declines / doesn't answer in 5 min → back to the admin) → rider **confirms the address** (calls the customer, pins the door) → **Start journey** (order becomes *out for delivery*, customer gets the live link) → **I've arrived** (only within 300 m of the pin) → **Send delivery code** → rider takes a **photo**, the customer checks their items and types the code from their text on the rider's phone → *delivered* (COD marked paid). Every step updates the order, the customer's page and the dashboard live.
 
 **Why the delivery code can't be faked:** the server makes it and texts it only to the customer; no API returns it (not even to the rider's app); only an HMAC bound to that one delivery is stored, so another order's code or a guess never matches; it expires in 10 minutes and dies after 5 wrong tries (each one alerts the admin); sending and using it both require the rider's GPS within `GEOFENCE_METERS` of the confirmed pin; a photo is required. If GPS is genuinely wrong at the door, an admin can **waive the location check** (recorded in the audit log). A rider using a GPS-spoofing app could still fake their position: the code (only the customer has it) and the photo are what prove the handover.
 
-**Live updates** use server-sent events over Redis Streams (`GET /api/v1/admin/events`, `/rider/events`, `/track/<token>/events`). Pages also refresh every 30 s in case a connection drops. Browsers only allow sound after a tap, so each page shows **Enable sound** once.
+**Notification bell:** the dashboard and rider app each have a bell with an unread count. Every admin gets new orders, cancellations, rider answers, wrong codes, failed and completed deliveries, address changes and rider applications; a rider gets only their own offers, reassignments, cancellations and address changes. Lines are saved in the `notifications` table, so people see what they missed while away, and cleared after 30 days. To add one, add a line to `ADMIN_TEXT` or `RIDER_TEXT` in `services/inbox.py`. While the page is closed only riders get alerted (web push, below); admins see the bell when they come back.
+
+**Calling the customer:** when a rider arrives, their app puts a "Call now" button at the top of the screen, and the customer also gets an automatic text. Calls use the rider's own phone. The dashboard shows the customer's number on every active delivery too, with a progress bar and the time of each step (offered, accepted, on the way, arrived, code sent) that updates by itself.
+
+**If a delivery fails:** the rider reports it and the customer is told by text. The order goes back to **Need a rider** on the dashboard with the reason, where an admin can offer it to another rider (who starts fresh, with no waived location check carried over) or cancel it. The customer can correct their address in the meantime.
+
+**Live updates** use server-sent events over Redis Streams (`GET /api/v1/admin/events`, `/rider/events`, `/track/<token>/events`). Pages also refresh every 30 s in case a connection drops. Browsers only allow sound after a tap, so the first tap on a page switches the alarm on. The speaker button in the header mutes it, and that choice is remembered on the device. Phone push alerts follow the phone's own settings.
 
 **Alerts when the rider app is closed (web push):** new offers, customer address changes and cancellations are pushed to the rider's phone, even with the app closed (Android Chrome, desktop browsers, and iPhone with the app added to the home screen, iOS 16.4+). The rider taps **Turn on alerts** once. It uses standard Web Push with your own VAPID keys (no Firebase account): run `python -m scripts.vapid_keys`, put both lines in `.env`, and **keep them** (new keys break existing subscriptions). Payloads are encrypted so only the phone can read them, and the server only sends to the known browser push services (`PUSH_ALLOWED_HOSTS`). Riders still get an SMS for each offer too. Browsers don't let a website choose the sound of a push notification (the phone's own alert sound plays), so the alert vibrates hard and stays on screen until tapped. While the app is open it plays its own loud, sharp beep, and an unanswered offer beeps again every 12 seconds.
 
@@ -136,11 +153,12 @@ The `backup` service writes `./backups/<db>_<timestamp>.dump` every `BACKUP_INTE
 
 ## Deploying (production)
 
-`docker-compose.yml` is for development (live reload, your code folder mounted in, database and Redis on `127.0.0.1` only). On the server use **`docker-compose.prod.yml`**: the code is baked into the image, only **Caddy** is reachable from outside (ports 80/443, automatic HTTPS certificates), Postgres/Redis/API sit on an internal network, Redis needs a password, migrations run once before the API starts, and every service restarts by itself.
+`docker-compose.yml` is for development (live reload, your code folder mounted in, database and Redis on `127.0.0.1` only). On the server use **`docker-compose.prod.yml`**: it runs the API **and the customer shop** (`../Frontend`). The code is baked into the images, only **Caddy** is reachable from outside (ports 80/443, automatic HTTPS for the API at `DOMAIN` and the shop at `SHOP_DOMAIN`), Postgres/Redis/API/shop sit on an internal network, Redis needs a password, migrations run once before the API starts, and every service restarts by itself.
 
 ```bash
-# on the server, with your domain's DNS (A record) pointing at it
-git clone <this repo> && cd cheapmarketdeal-api/Backend
+# on the server, with DNS A records for BOTH domains (e.g. api.yourdomain.com and
+# yourdomain.com) pointing at it
+git clone <this repo> && cd cheapmarketdeal-api/Backend   # the shop is built from ../Frontend
 cp .env.production.example .env        # fill in every value marked REQUIRED
 mkdir -p backups
 docker compose -f docker-compose.prod.yml up -d --build

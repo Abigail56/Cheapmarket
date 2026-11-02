@@ -4,40 +4,95 @@
   <meta charset="utf-8">
   <meta name="referrer" content="strict-origin-when-cross-origin">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#1f8a4c">
-  <title>Cheapmarketdeal Rider</title>
+  <meta name="theme-color" content="#1c7946">
+  <title>Cheapmarket Rider</title>
   <link rel="manifest" href="/rider/manifest.webmanifest">
   <link rel="icon" href="/rider/icon.svg" type="image/svg+xml">
-  <link rel="apple-touch-icon" href="/rider/icon.svg">
+  <link rel="apple-touch-icon" href="/rider/apple-touch-icon.png">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
         integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap">
   <link rel="stylesheet" href="/static/common.css">
+  <style>
+    /* Sign-in and application screens only. Photo: "Boda Boda Kenya", CC0, https://commons.wikimedia.org/wiki/File:Boda_Boda_Kenya.jpg */
+    body.public::before {
+      content: ""; position: fixed; inset: 0; z-index: -1; background-color: #0b2a1c;
+      background-image: linear-gradient(rgba(8, 35, 22, .15), rgba(8, 35, 22, .3) 240px, #0b2a1c 360px), url(/static/rider-bg.jpg);
+      background-position: 0 0, center 52px; background-size: auto, 100% auto; background-repeat: no-repeat;
+    }
+    /* Phones: the rider shows at the top, with the form below */
+    body.public main { padding-top: 210px; }
+    @media (min-width: 700px) {
+      /* Wider screens have room for the whole photo behind the form */
+      body.public::before {
+        background-image: linear-gradient(rgba(8, 35, 22, .55), rgba(8, 35, 22, .55)), url(/static/rider-bg.jpg);
+        background-position: 0 0, 35% center; background-size: auto, cover;
+      }
+      body.public main { padding-top: 32px; }
+    }
+    .progress { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; margin: 12px 0 14px; }
+    .progress div { font-size: 12px; font-weight: 600; color: var(--muted); }
+    .progress div::before { content: ""; display: block; height: 5px; border-radius: 999px; background: var(--line); margin-bottom: 5px; }
+    .progress .done { color: var(--text); }
+    .progress .done::before { background: var(--brand); }
+    .progress .now { color: var(--text); font-weight: 800; }
+    .progress .now::before { background: var(--deal); }
+    .who { font-size: 17px; font-weight: 700; margin: 8px 0 0; }
+    .place { margin: 2px 0; }
+    .offer-time { font-size: 24px; margin: 4px 0 6px; }
+    .step { display: flex; gap: 12px; padding: 14px 0; border-top: 1px solid var(--line); }
+    .step-no { width: 28px; height: 28px; flex: none; border-radius: 50%; display: grid; place-items: center; font-size: 14px; font-weight: 800; background: var(--chip); color: var(--text); }
+    .step.done .step-no { background: var(--brand); color: var(--brand-ink); }
+    .step.done .step-no svg { width: 15px; height: 15px; }
+    .step-body { flex: 1; min-width: 0; }
+    .step-body button, .step-body .photo-tile { margin-top: 8px; }
+    label.photo-tile {
+      display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; margin-bottom: 0;
+      min-height: 130px; padding: 16px; border: 2px dashed var(--line); border-radius: 16px; background: var(--bg);
+      font-weight: 700; color: var(--brand); text-align: center; cursor: pointer;
+    }
+    label.photo-tile svg { width: 32px; height: 32px; }
+    label.photo-tile small { font-weight: 500; font-size: 13px; color: var(--muted); }
+    label.photo-tile.has-photo { padding: 0; border: 0; min-height: 0; background: none; position: relative; }
+    label.photo-tile.has-photo .photo-preview { margin: 0; }
+    .retake { position: absolute; right: 10px; bottom: 10px; background: rgba(15,20,16,.75); color: #fff; padding: 6px 12px; border-radius: 999px; font-size: 14px; }
+    .call-box { background: var(--brand-soft); border-radius: 14px; padding: 14px; margin: 12px 0 14px; }
+    .call-box p { margin: 2px 0 10px; }
+    .handover-note { background: var(--deal-soft); color: var(--deal); border-radius: 12px; padding: 10px 12px; font-size: 14px; font-weight: 600; margin-top: 8px; }
+  </style>
 </head>
 <body>
   <header class="bar">
-    <h1><span class="brand">Cheapmarketdeal</span> Rider</h1>
-    <span id="live" class="status-dot" title="Live connection"></span>
+    <h1><span class="brand">Cheapmarket</span> <span class="sub">Rider</span> <span id="live" class="status-dot" title="Live connection"></span></h1>
     <span id="sound"></span>
-    <button id="logout" class="small secondary hidden" type="button">Log out</button>
+    <div id="bell" class="hidden"></div>
+    <button id="logout" class="small quiet hidden" type="button">Sign out</button>
   </header>
 
   <main>
+    <div id="install" class="banner warn hidden">
+      <strong>Install the rider app</strong>
+      <div id="install-text">Add it to your phone so it opens like a normal app.</div>
+      <button id="install-btn" class="small mt" type="button">Install</button>
+    </div>
+
     <section id="login" class="card hidden">
-      <h2>Rider sign in</h2>
-      <p class="muted">Use the email and password your admin gave you.</p>
+      <h2>Welcome back</h2>
+      <p class="muted">Sign in to see your deliveries.</p>
       <form id="login-form" class="stack">
         <div><label for="email">Email</label><input id="email" type="email" autocomplete="username" required></div>
         <div><label for="password">Password</label><input id="password" type="password" autocomplete="current-password" required></div>
-        <button type="submit">Sign in</button>
+        <button type="submit" class="full">Sign in</button>
       </form>
       <div class="or hidden" id="or-login">or</div>
       <div id="google-login" class="google-btn hidden"></div>
-      <p class="muted" style="margin-top:16px">New rider? <a href="#" id="show-apply">Apply to ride with us</a></p>
+      <p class="muted" style="margin-top:16px">New here? <a href="#" id="show-apply">Apply to ride with us</a></p>
     </section>
 
     <section id="apply" class="card hidden">
-      <h2>Apply to ride with us</h2>
-      <p class="muted">Fill this in and we'll review it. You'll get an SMS when you're approved, then you can sign in.</p>
+      <h2>Ride with us</h2>
+      <p class="muted">Tell us a bit about yourself. We'll text you as soon as we've had a look, then you can sign in.</p>
       <div id="google-apply" class="google-btn hidden"></div>
       <p id="google-apply-done" class="banner cash hidden"></p>
       <form id="apply-form" class="stack">
@@ -55,8 +110,8 @@
             <option value="car">Car</option>
             <option value="van">Van</option>
           </select></div>
-        <h3>Your ID</h3>
-        <p class="muted">We use this only to confirm who you are. Only our admins can see it.</p>
+        <h3 class="mt">Your ID</h3>
+        <p class="muted">We only use this to confirm it's you, and only our admins can see it.</p>
         <div><label for="a-idtype">ID type</label>
           <select id="a-idtype" required>
             <option value="nin">NIN (slip or card)</option>
@@ -65,41 +120,42 @@
             <option value="passport">International passport</option>
           </select></div>
         <div><label for="a-idnumber">ID number</label><input id="a-idnumber" minlength="4" maxlength="40" autocomplete="off" required></div>
-        <div><label for="a-idfront">Photo of the ID (front)</label>
+        <div><label for="a-idfront">Photo of your ID (front)</label>
           <input id="a-idfront" type="file" accept="image/*,application/pdf" capture="environment" required>
           <img class="photo-preview hidden" id="p-idfront" alt="ID front"></div>
-        <div><label for="a-idback">Photo of the ID (back, if it has one)</label>
+        <div><label for="a-idback">Photo of your ID (back, if it has one)</label>
           <input id="a-idback" type="file" accept="image/*,application/pdf" capture="environment">
           <img class="photo-preview hidden" id="p-idback" alt="ID back"></div>
         <div><label for="a-selfie">A clear photo of your face</label>
           <input id="a-selfie" type="file" accept="image/*" capture="user" required>
           <img class="photo-preview hidden" id="p-selfie" alt="Selfie"></div>
-        <h3>Your ride</h3>
-        <div><label for="a-plate">Plate number (if any)</label><input id="a-plate" maxlength="20" placeholder="e.g. LSD 123 AB"></div>
-        <div><label for="a-area">Area you want to deliver in</label><input id="a-area" maxlength="120" placeholder="e.g. Lekki, Ajah"></div>
-        <div><label for="a-note">Anything else? (optional)</label><textarea id="a-note" maxlength="500" rows="2"></textarea></div>
-        <button type="submit">Send application</button>
-        <button type="button" class="secondary" id="back-to-login">Back to sign in</button>
+        <h3 class="mt">Your ride</h3>
+        <div><label for="a-plate">Plate number (if you have one)</label><input id="a-plate" maxlength="20" placeholder="LSD 123 AB"></div>
+        <div><label for="a-area">Where would you like to deliver?</label><input id="a-area" maxlength="120" placeholder="Lekki, Ajah"></div>
+        <div><label for="a-note">Anything else we should know? (optional)</label><textarea id="a-note" maxlength="500" rows="2"></textarea></div>
+        <button type="submit" class="full">Send my application</button>
+        <button type="button" class="secondary full" id="back-to-login">Back to sign in</button>
       </form>
     </section>
 
     <section id="applied" class="card hidden">
-      <h2>Application received ✅</h2>
-      <p>Thanks! We'll review it and send you an SMS as soon as you're approved. Then come back here and sign in.</p>
-      <button type="button" class="secondary" id="applied-back">Back to sign in</button>
+      <h2>Thanks, we've got it</h2>
+      <p>We'll have a look and text you as soon as you're approved. Then come back here and sign in.</p>
+      <button type="button" class="secondary full" id="applied-back">Back to sign in</button>
     </section>
 
     <section id="app" class="hidden">
-      <div id="install" class="banner warn hidden">
-        Install this app on your phone so offers can reach you: <button id="install-btn" class="small" type="button">Install</button>
-      </div>
       <div id="alerts" class="banner warn hidden">
         <div id="alerts-text">Turn on alerts so new deliveries reach you even when this app is closed.</div>
-        <button id="alerts-btn" class="small" type="button" style="margin-top:8px">🔔 Turn on alerts</button>
+        <button id="alerts-btn" class="small mt" type="button">Turn on alerts</button>
       </div>
-      <div id="gps" class="muted"></div>
+      <div id="done" class="card hidden">
+        <div class="between"><h2 id="done-title"></h2><button class="quiet small" id="done-close" type="button">Close</button></div>
+        <p class="muted" id="done-text"></p>
+      </div>
+      <div id="gps" class="muted" style="margin-bottom:8px"></div>
       <div id="jobs"></div>
-      <p id="empty" class="muted hidden">No deliveries right now. Keep this app open: you'll hear a chime when an admin assigns you one.</p>
+      <div id="empty" class="card empty hidden"><strong>No deliveries right now</strong>Keep this app open. You'll hear it the moment one comes in.</div>
     </section>
   </main>
 

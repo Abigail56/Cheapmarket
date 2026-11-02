@@ -53,7 +53,7 @@ async def apply(session: AsyncSession, data: RiderSignup, documents: dict[Docume
         "application_id": application.id, "full_name": user.full_name,
         "vehicle_type": application.vehicle_type.value, "area": application.area})
     await notifications.enqueue("sms", user.phone,
-                                "Cheapmarketdeal: thanks for applying to ride with us. We'll text "
+                                "Cheapmarket: thanks for applying to ride with us. We'll text "
                                 "you as soon as your account is approved.")
     return application
 
@@ -83,7 +83,7 @@ async def approve(session: AsyncSession, application: RiderApplication, admin: U
                          {"application_id": application.id, "full_name": user.full_name})
     if user.phone:
         await notifications.enqueue("sms", user.phone,
-                                    "Cheapmarketdeal: you're approved as a rider! Sign in to the "
+                                    "Cheapmarket: you're approved as a rider! Sign in to the "
                                     f"rider app with {user.email} and keep it open to receive deliveries.")
     return application
 
@@ -100,7 +100,7 @@ async def reject(session: AsyncSession, application: RiderApplication, admin: Us
     await session.commit()
     if user.phone:
         await notifications.enqueue("sms", user.phone,
-                                    f"Cheapmarketdeal: sorry, we can't approve your rider application. {reason}")
+                                    f"Cheapmarket: sorry, we can't approve your rider application. {reason}")
     return application
 
 
