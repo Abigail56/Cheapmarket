@@ -246,3 +246,66 @@ $("#coupon-list").onclick = (e) => {
   const c = store.coupons.find((x) => x.id === e.target.closest("[data-id]")?.dataset.id);
   if (c && e.target.closest("[data-edit]")) couponForm(c);
 };
+
+// ---------------------------------------------------------------- riders
+async function loadRiders() {
+  store.riders = await session.api("/admin/riders");
+  renderRiders();
+}
+
+function renderRiders() {
+  $("#n-riders").textContent = store.riders.length;
+  $("#rider-list").innerHTML = store.riders.length ? store.riders.map((r) => {
+    const extra = [r.vehicle_type, r.area].filter(Boolean).join(" · ");
+    return `<div class="product" data-id="${esc(r.id)}">
+      <div class="product-info">
+        <strong>${esc(r.full_name)}</strong>
+        ${!r.is_active ? ` <span class="chip cancelled">Suspended</span>` : r.active_deliveries ? ` <span class="chip en_route">On a delivery</span>` : ""}
+        <div class="muted">${r.phone ? `<a href="tel:${esc(r.phone)}">${esc(r.phone)}</a> · ` : ""}${esc(r.email)}${extra ? ` · ${esc(extra)}` : ""}</div>
+      </div>
+      <div class="row tight product-actions">
+        <button type="button" class="small ${r.is_active ? "danger" : "secondary"}" data-toggle-rider>${r.is_active ? "Suspend" : "Restore"}</button>
+      </div>
+    </div>`;
+  }).join("") : `<p class="muted">No riders yet.</p>`;
+}
+
+function riderForm() {
+  storeDialog("Add a rider", `
+    <label for="r-name">Full name</label><input id="r-name" maxlength="150" required>
+    <label for="r-phone">Phone number</label><input id="r-phone" type="tel" inputmode="tel" required placeholder="0803 123 4567">
+    <label for="r-email">Email</label><input id="r-email" type="email" required>
+    <label for="r-password">Temporary password</label><input id="r-password" type="text" minlength="8" autocomplete="new-password" required>
+    <p class="muted">Give the rider this password yourself. They can change it with "Forgot password" on the shop's sign-in page.</p>`,
+  "Add rider", async (box) => {
+    const body = {
+      full_name: $("#r-name", box).value.trim(), phone: $("#r-phone", box).value.trim(),
+      email: $("#r-email", box).value.trim(), password: $("#r-password", box).value, role: "rider",
+    };
+    if (body.full_name.length < 2) { toast("Enter the rider's full name.", "error"); return false; }
+    if (body.phone.replace(/\D/g, "").length < 10) { toast("Enter the rider's phone number.", "error"); return false; }
+    if (!/^\S+@\S+\.\S+$/.test(body.email)) { toast("Enter a valid email.", "error"); return false; }
+    if (body.password.length < 8) { toast("The password needs at least 8 characters.", "error"); return false; }
+    await session.api("/admin/users", { method: "POST", json: body });
+    await loadRiders();
+    load().catch(() => {});  // so they appear in the "Assign rider" lists straight away
+    toast(`${body.full_name} is added`);
+    return true;
+  });
+}
+
+$("#rider-add").onclick = () => riderForm();
+$("#rider-list").onclick = async (e) => {
+  const r = store.riders.find((x) => x.id === e.target.closest("[data-id]")?.dataset.id);
+  if (!r || !e.target.closest("[data-toggle-rider]")) return;
+  const yes = await ask(r.is_active
+    ? { title: `Suspend ${r.full_name}?`, text: "They won't be able to sign in or be given deliveries until you restore them.", ok: "Suspend", danger: true }
+    : { title: `Restore ${r.full_name}?`, text: "They'll be able to sign in and take deliveries again.", ok: "Restore" });
+  if (!yes) return;
+  try {
+    await session.api(`/admin/users/${r.id}`, { method: "PATCH", json: { is_active: !r.is_active } });
+    await loadRiders();
+    load().catch(() => {});
+    toast(r.is_active ? `${r.full_name} is suspended` : `${r.full_name} is restored`);
+  } catch (err) { toast(err.message, "error"); }
+};

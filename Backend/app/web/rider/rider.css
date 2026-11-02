@@ -1,0 +1,45 @@
+/* The rider's work screen: large, plain and readable outdoors at a glance. */
+body:not(.public) main { padding-top: 12px; }
+header.bar { padding: 8px 10px 8px 14px; }
+header.bar .sub { font-size: 13px; }
+
+/* set-up reminders: one slim row each, so the delivery stays near the top */
+#install, #alerts { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 12px; align-items: center; margin: 0 0 8px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--card); color: var(--text); font-size: 14px; font-weight: 500; }
+#install.hidden, #alerts.hidden { display: none !important; }
+#install strong { grid-column: 1; font-size: 14px; }
+#install-text { grid-column: 1; color: var(--muted); font-size: 13px; line-height: 1.35; }
+#install-btn { grid-column: 2; grid-row: 1 / span 2; margin: 0; }
+#alerts-text { line-height: 1.35; }
+#alerts-btn { margin: 0; }
+#gps { margin: 0 0 8px !important; padding: 0 4px; font-size: 13px; }
+
+/* a delivery */
+#jobs .card { padding: 16px; border-radius: 16px; }
+.job-head { margin-bottom: 4px; }
+.job-no { color: var(--muted); font-size: 14px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.offer-time { margin: 2px 0 10px; font-size: 22px; font-weight: 650; letter-spacing: -.01em; }
+#jobs .banner.cash { margin: 0 0 12px; font-size: 17px; font-weight: 650; border-radius: 10px; }
+.job-customer { display: flex; gap: 12px; align-items: flex-start; justify-content: space-between; }
+.job-who { min-width: 0; }
+.job-who h2 { margin: 0 0 4px; font-size: 21px; font-weight: 650; letter-spacing: -.015em; }
+.job-address { display: flex; gap: 6px; font-size: 16px; line-height: 1.35; }
+.job-address svg { width: 18px; height: 18px; flex: none; margin-top: 2px; fill: none; stroke: var(--muted); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.job-call { display: inline-flex; flex: none; align-items: center; gap: 6px; min-height: 44px; padding: 0 14px; border-radius: 10px; background: var(--brand-soft); color: var(--brand); font-size: 15px; font-weight: 600; text-decoration: none; }
+.job-call svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.job-items { display: flex; gap: 12px; justify-content: space-between; margin: 12px 0 0; padding: 10px 0 0; border-top: 1px solid var(--line); color: var(--muted); font-size: 14px; }
+.job-items strong { flex: none; color: var(--text); font-weight: 600; }
+.job-offer { margin-top: 14px; }
+.job-offer button { min-height: 52px; font-size: 17px; }
+.job-offer button.quiet { min-height: 44px; margin-top: 4px; font-size: 15px; }
+#jobs .step { padding: 14px 0; }
+#jobs .step:first-of-type { margin-top: 12px; }
+.step-body h3 { font-weight: 650; }
+
+/* nothing to do */
+#empty { padding: 44px 20px; }
+#empty strong { font-size: 19px; font-weight: 650; margin-bottom: 6px; }
+.empty-icon { display: grid; place-items: center; width: 64px; height: 64px; margin: 0 auto 14px; border-radius: 50%; background: var(--brand-soft); color: var(--brand); }
+.empty-icon svg { width: 32px; height: 32px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+
+/* signed-out forms keep their roomy card */
+body.public #install { margin-bottom: 12px; }

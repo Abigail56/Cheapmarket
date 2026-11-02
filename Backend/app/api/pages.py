@@ -34,6 +34,11 @@ async def rider_js():
     return _page(WEB / "rider" / "rider.js", "text/javascript; charset=utf-8")
 
 
+@router.get("/rider/rider.css")
+async def rider_css():
+    return _page(WEB / "rider" / "rider.css", "text/css; charset=utf-8")
+
+
 @router.get("/rider/sw.js")
 async def rider_service_worker():
     return _page(WEB / "rider" / "sw.js", "text/javascript; charset=utf-8")

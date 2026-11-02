@@ -1,4 +1,5 @@
 import secrets
+import uuid
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, File, Form, UploadFile, status
@@ -7,18 +8,21 @@ from pydantic import ValidationError
 
 from app.api.deps import (
     AuthContext,
+    CurrentUser,
     RedisDep,
     SessionDep,
     get_auth_context,
     rate_limit,
 )
 from app.core.config import settings
-from app.core.exceptions import BadRequest
+from app.core.exceptions import BadRequest, Forbidden, Unauthorized
 from app.models.rider_application import DocumentKind
+from app.models.user import User, UserRole
 from app.schemas.auth import (
     AuthResponse,
     ForgotPasswordRequest,
     GoogleSignIn,
+    HandoffRedeem,
     LoginRequest,
     RefreshRequest,
     RegisterRequest,
@@ -102,7 +106,34 @@ async def rider_signup(
 @router.get("/config")
 async def auth_config() -> dict:
     """What the sign-in pages need to know: the Google client ID (null = no Google button)."""
-    return {"google_client_id": settings.GOOGLE_CLIENT_ID if google_auth.enabled() else None}
+    return {"google_client_id": settings.GOOGLE_CLIENT_ID if google_auth.enabled() else None,
+            "shop_url": settings.FRONTEND_URL}
+
+
+HANDOFF_PREFIX = "auth:handoff:"
+HANDOFF_SECONDS = 60
+STAFF_ROLES = (UserRole.ADMIN, UserRole.RIDER)
+
+
+@router.post("/handoff", dependencies=[Depends(rate_limit("handoff", 10))])
+async def create_handoff(user: CurrentUser, redis: RedisDep) -> dict[str, str]:
+    """A short-lived, single-use code that moves an admin or rider from the shop to the
+    dashboard or rider app, which are a separate site. Only this code goes in the address bar, never a token."""
+    if user.role not in STAFF_ROLES:
+        raise Forbidden("Only staff accounts use this")
+    code = secrets.token_urlsafe(32)
+    await redis.set(f"{HANDOFF_PREFIX}{code}", str(user.id), ex=HANDOFF_SECONDS)
+    return {"code": code}
+
+
+@router.post("/handoff/redeem", response_model=TokenPair, dependencies=[Depends(rate_limit("handoff-redeem", 20))])
+async def redeem_handoff(data: HandoffRedeem, session: SessionDep, redis: RedisDep):
+    user_id = await redis.getdel(f"{HANDOFF_PREFIX}{data.code}")
+    user = await session.get(User, uuid.UUID(user_id)) if user_id else None
+    if not user or user.role not in STAFF_ROLES:
+        raise Unauthorized("That sign-in link has expired. Please sign in again.", code="handoff_invalid")
+    await auth_service.check_can_sign_in(session, user)
+    return auth_service.issue_tokens(user)
 
 
 @router.post("/google", response_model=AuthResponse,

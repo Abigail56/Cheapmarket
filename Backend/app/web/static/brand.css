@@ -1,0 +1,23 @@
+/* The shop's look for the dashboard and rider app: forest green, Geist, white cards, always light. */
+:root {
+  --bg: #f4f6f4; --card: #ffffff; --text: #16201b; --muted: #5a6760; --line: #e2e7e3;
+  --brand: #1f5540; --brand-dark: #184634; --brand-ink: #ffffff; --brand-soft: #e0e9e4;
+  --deal: #b4431a; --deal-soft: #f9e4da; --good: #1f5540; --good-soft: #e0efe6;
+  --chip: #edf0ed; --shadow: 0 1px 2px rgba(16, 32, 24, .05);
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #f4f6f4; --card: #ffffff; --text: #16201b; --muted: #5a6760; --line: #e2e7e3;
+    --brand: #1f5540; --brand-dark: #184634; --brand-ink: #ffffff; --brand-soft: #e0e9e4;
+    --deal: #b4431a; --deal-soft: #f9e4da; --warn: #a15c07; --warn-soft: #fdf1d7;
+    --bad: #b42318; --bad-soft: #fde8e6; --good: #1f5540; --good-soft: #e0efe6;
+    --info: #1d4f91; --info-soft: #e3edfb; --violet: #5b3aa8; --violet-soft: #eee8fb;
+    --chip: #edf0ed; --shadow: 0 1px 2px rgba(16, 32, 24, .05);
+    color-scheme: light;
+  }
+}
+.toast { border-radius: 10px; font-size: 14px; }
+.toast.good { background: #1f5540; }
+body { font-family: "Geist", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+

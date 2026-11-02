@@ -87,11 +87,11 @@ The customer gets an SMS (and an email, if they gave one) when the order is plac
 
 Admins sign in at `/dashboard` and open **Products & prices** to add or edit products, upload photos, set stock, and put items on sale. A discount is a percentage off the normal price, on one product, one category or the whole shop. A new discount replaces the old one (they never stack), and ending it restores the normal price. Each change is recorded in the audit log.
 
-The **Categories** tab adds, renames and deletes categories (a category must be empty before it can be deleted), and **Delivery areas** sets each area's name, fee and free-delivery amount, and whether customers can choose it at checkout. **Coupons** creates discount codes and turns them on or off.
+The **Categories** tab adds, renames and deletes categories (a category must be empty before it can be deleted), and **Delivery areas** sets each area's name, fee and free-delivery amount, and whether customers can choose it at checkout. **Coupons** creates discount codes and turns them on or off. **Riders** adds riders directly and suspends or restores them.
 
 ## New-order alarm
 
-While `/dashboard` is open, a new order sets off a siren that repeats until someone taps **Stop alarm** or deals with the order. It also rings for orders placed while the page was closed or the connection was down. Browsers keep a page silent until it has been clicked once, so the page shows a reminder until then. A closed browser can't ring, so set `ADMIN_ALERT_PHONES` and/or `ADMIN_ALERT_EMAILS` to also send each new order by SMS or email.
+While `/dashboard` is open, a new order sets off a soft chime that repeats until someone taps **Stop alarm** or deals with the order. It also rings for orders placed while the page was closed or the connection was down. Browsers keep a page silent until it has been clicked once, so the page shows a reminder until then. A closed browser can't ring, so set `ADMIN_ALERT_PHONES` and/or `ADMIN_ALERT_EMAILS` to also send each new order by SMS or email.
 
 ## Riders, tracking and live dashboard
 

@@ -390,9 +390,27 @@ const Sound = {
     good: [{ low: 900, high: 1750, period: 0.2, cycles: 5 }],
     info: [{ low: 800, high: 1600, period: 0.7, cycles: 0.5 }],
   },
+  // A soft three-note bell for the admin's new-order alarm: clear, but not a siren.
+  chime() {
+    const start = this.ctx.currentTime + 0.03;
+    [659.25, 830.61, 987.77].forEach((freq, i) => {
+      const at = start + i * 0.22;
+      const osc = this.ctx.createOscillator();
+      const env = this.ctx.createGain();
+      osc.type = "sine";
+      osc.frequency.value = freq;
+      env.gain.setValueAtTime(0, at);
+      env.gain.linearRampToValueAtTime(0.5, at + 0.015);
+      env.gain.exponentialRampToValueAtTime(0.001, at + 0.9);
+      osc.connect(env).connect(this.comp);
+      osc.start(at);
+      osc.stop(at + 0.95);
+    });
+  },
   play(kind = "alert") {
     if (!this.ready() || !this.enabled) return;
     this.wake();
+    if (kind === "chime") { this.chime(); return; }
     const parts = this.SIRENS[kind] || this.SIRENS.alert;
     const start = this.ctx.currentTime + 0.03;
     const length = parts.reduce((t, p) => t + p.period * p.cycles, 0);

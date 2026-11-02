@@ -9,8 +9,18 @@ const normalPrice = (p) => (p.compare_at_price && p.compare_at_price > p.price ?
 const categoryName = (id) => products.categories.find((c) => c.id === id)?.name || "";
 
 // ---------------------------------------------------------------- switching views
+const VIEW_HEADS = {
+  deliveries: ["Orders & deliveries", "What needs doing right now."],
+  products: ["Products & prices", "Add products, set prices and stock, and run discounts."],
+  categories: ["Categories", "The groups customers browse in the shop."],
+  zones: ["Delivery areas", "Where you deliver and what it costs."],
+  coupons: ["Coupons", "Codes customers can use at checkout."],
+  riders: ["Riders", "Add riders, and suspend anyone who has stopped working."],
+};
+
 function showView(view) {
-  for (const name of ["deliveries", "products", "categories", "zones", "coupons"]) {
+  [$("#page-title").textContent, $("#page-sub").textContent] = VIEW_HEADS[view];
+  for (const name of ["deliveries", "products", "categories", "zones", "coupons", "riders"]) {
     $(`#view-${name}`).classList.toggle("hidden", name !== view);
   }
   document.querySelectorAll("[data-view]").forEach((b) => {
@@ -23,9 +33,12 @@ function showView(view) {
   if (view === "categories") loadCategories().catch(onError);
   if (view === "zones") loadZones().catch(onError);
   if (view === "coupons") loadCoupons().catch(onError);
+  if (view === "riders") loadRiders().catch(onError);
+  if (view === "deliveries") showTodayLine();
   if (view === "deliveries") map?.invalidateSize();  // the map can't measure itself while hidden
 }
 document.querySelectorAll("[data-view]").forEach((b) => { b.onclick = () => showView(b.dataset.view); });
+fetch(`${API}/auth/config`).then((r) => r.json()).then((c) => { if (c.shop_url) $("#view-shop").href = c.shop_url; }).catch(() => {});
 
 // ---------------------------------------------------------------- loading
 async function loadProducts() {

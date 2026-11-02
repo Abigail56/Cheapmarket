@@ -5,12 +5,12 @@
   <meta name="referrer" content="strict-origin-when-cross-origin">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="robots" content="noindex">
-  <title>Live deliveries · Cheapmarket</title>
+  <title>Admin · Cheapmarket</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
         integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
-  <link rel="icon" href="/rider/icon.svg" type="image/svg+xml">
+  <link rel="icon" href="/static/admin-icon.png" type="image/png">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&display=swap">
   <link rel="stylesheet" href="/static/common.css">
   <style>
     .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 14px; }
@@ -75,18 +75,20 @@
     @keyframes order-alarm { 50% { background: #7a1a12; } }
     @media (prefers-reduced-motion: reduce) { .order-alarm { animation: none; } }
   </style>
+  <link rel="stylesheet" href="/static/brand.css">
+  <link rel="stylesheet" href="/static/admin.css">
 </head>
 <body>
   <header class="bar">
-    <h1><span class="brand">Cheapmarket</span> <span class="sub">Admin</span> <span id="live" class="status-dot" title="Live connection"></span></h1>
+    <h1><img class="admin-logo" src="/static/logo.png" alt="Cheapmarket" width="662" height="144"> <span class="admin-tag">Admin</span> <span id="live" class="status-dot" title="Live connection"></span></h1>
     <span id="sound"></span>
     <div id="bell" class="hidden"></div>
     <button id="logout" class="small quiet hidden" type="button">Sign out</button>
   </header>
   <main class="wide">
     <section id="login" class="card hidden" style="max-width:420px;margin:40px auto">
-      <h2>Welcome back</h2>
-      <p class="muted">Sign in to see today's orders and riders.</p>
+      <h2>Admin sign in</h2>
+      <p class="muted">Manage orders, products and deliveries.</p>
       <form id="login-form" class="stack">
         <div><label for="email">Email</label><input id="email" type="email" autocomplete="username" required></div>
         <div><label for="password">Password</label><input id="password" type="password" autocomplete="current-password" required></div>
@@ -96,18 +98,24 @@
       <div id="google-login" class="google-btn hidden"></div>
     </section>
     <section id="app" class="hidden">
+      <aside class="side">
+        <nav class="views" aria-label="Admin sections">
+          <button type="button" data-view="deliveries" aria-pressed="true"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7h11v10H3z"/><path d="M14 11h4l3 3v3h-7"/><circle cx="7.5" cy="18" r="1.8"/><circle cx="17.5" cy="18" r="1.8"/></svg>Orders &amp; deliveries <span id="nav-new" class="nav-count zero"></span></button>
+          <button type="button" class="secondary" data-view="products" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12V4h8l10 10-8 8z"/><circle cx="7.5" cy="8.5" r="1.3"/></svg>Products &amp; prices</button>
+          <button type="button" class="secondary" data-view="categories" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="7" height="7" rx="1"/><rect x="13" y="4" width="7" height="7" rx="1"/><rect x="4" y="13" width="7" height="7" rx="1"/><rect x="13" y="13" width="7" height="7" rx="1"/></svg>Categories</button>
+          <button type="button" class="secondary" data-view="riders" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="17" r="3"/><circle cx="18" cy="17" r="3"/><path d="M6 17l4-7h5l3 7M10 10L8.5 7H6M15 10l2-4h3"/></svg>Riders <span id="nav-riders" class="nav-count zero"></span></button>
+        <button type="button" class="secondary" data-view="zones" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s7-6.2 7-11.5A7 7 0 0 0 5 9.5C5 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.4"/></svg>Delivery areas</button>
+          <button type="button" class="secondary" data-view="coupons" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 8h18v3a2 2 0 0 0 0 4v3H3v-3a2 2 0 0 0 0-4z"/><path d="M14 8v2M14 13v1M14 17v1"/></svg>Coupons</button>
+        </nav>
+        <a class="side-link" id="view-shop" href="/" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 4h6v6"/><path d="M20 4l-9 9"/><path d="M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></svg>View shop</a>
+      </aside>
+      <div class="content">
+      <div class="page-head"><h2 id="page-title">Orders &amp; deliveries</h2><p id="page-sub">What needs doing right now.</p></div>
       <div id="order-alarm" class="order-alarm hidden" role="alert">
         <span id="order-alarm-text"></span>
         <button type="button" id="order-alarm-stop">Stop alarm</button>
       </div>
       <p id="alarm-sound-note" class="banner warn hidden" role="status"></p>
-      <nav class="views" aria-label="Admin sections">
-        <button type="button" data-view="deliveries" aria-pressed="true">Deliveries</button>
-        <button type="button" class="secondary" data-view="products" aria-pressed="false">Products &amp; prices</button>
-        <button type="button" class="secondary" data-view="categories" aria-pressed="false">Categories</button>
-        <button type="button" class="secondary" data-view="zones" aria-pressed="false">Delivery areas</button>
-        <button type="button" class="secondary" data-view="coupons" aria-pressed="false">Coupons</button>
-      </nav>
       <div id="view-products" class="hidden">
         <div class="card">
           <h2>Discount many products</h2>
@@ -125,7 +133,7 @@
         </div>
         <div class="card">
           <div class="between">
-            <h2>Products <span id="n-products" class="count"></span></h2>
+            <h2>All products <span id="n-products" class="count"></span></h2>
             <button type="button" class="small" id="product-add">Add a product</button>
           </div>
           <div class="product-filters">
@@ -138,7 +146,7 @@
       <div id="view-categories" class="hidden">
         <div class="card">
           <div class="between">
-            <h2>Categories <span id="n-categories" class="count"></span></h2>
+            <h2>All categories <span id="n-categories" class="count"></span></h2>
             <button type="button" class="small" id="category-add">Add a category</button>
           </div>
           <p class="muted">These are the groups customers browse in the shop. To remove one, first edit its products to move them to another category.</p>
@@ -148,7 +156,7 @@
       <div id="view-zones" class="hidden">
         <div class="card">
           <div class="between">
-            <h2>Delivery areas <span id="n-zones" class="count"></span></h2>
+            <h2>All delivery areas <span id="n-zones" class="count"></span></h2>
             <button type="button" class="small" id="zone-add">Add an area</button>
           </div>
           <p class="muted">Customers choose one of these at checkout, and it sets their delivery fee. Orders already placed keep the fee they paid.</p>
@@ -158,11 +166,22 @@
       <div id="view-coupons" class="hidden">
         <div class="card">
           <div class="between">
-            <h2>Coupons <span id="n-coupons" class="count"></span></h2>
+            <h2>All coupons <span id="n-coupons" class="count"></span></h2>
             <button type="button" class="small" id="coupon-add">Add a coupon</button>
           </div>
           <p class="muted">Customers type a code at checkout to get money off their order. Turn a coupon off at any time to stop it working.</p>
           <div id="coupon-list"><p class="muted">Loading…</p></div>
+        </div>
+      </div>
+      <div id="view-riders" class="hidden">
+        <div class="card">
+          <div class="between">
+            <h2>All riders <span id="n-riders" class="count"></span></h2>
+            <button type="button" class="small" id="rider-add">Add a rider</button>
+          </div>
+          <p class="muted">Approved riders can be assigned orders straight away.</p>
+          <div id="rider-pending" class="banner warn between hidden"><span></span><button type="button" class="small">Review applications</button></div>
+          <div id="rider-list"><p class="muted">Loading…</p></div>
         </div>
       </div>
       <div id="view-deliveries">
@@ -172,18 +191,19 @@
         <div class="stat" id="s-active"><b></b><span>Out with riders</span></div>
         <div class="stat" id="s-free"><b></b><span>Riders free</span></div>
       </div>
+      <div class="card hidden" id="apps-card"><h2>People who want to ride <span id="n-apps" class="count"></span></h2><div id="apps"></div></div>
+      <div class="pipeline">
+        <div class="card step-card"><h2><span class="step-num">1</span>New orders <span id="n-new" class="count"></span></h2><p class="muted step-hint">Check the order, then confirm it.</p><div id="new-orders"></div></div>
+        <div class="card step-card"><h2><span class="step-num">2</span>Need a rider <span id="n-waiting" class="count"></span></h2><p class="muted step-hint">Choose who delivers it.</p><div id="waiting"></div></div>
+        <div class="card step-card"><h2><span class="step-num">3</span>Out with riders <span id="n-active" class="count"></span></h2><p class="muted step-hint">Follow each delivery to the door.</p><div id="active"></div></div>
+      </div>
       <div class="grid">
+        <div class="card"><h2>Where everyone is</h2><div id="map" class="map tall"></div><div id="riders" class="muted"></div></div>
         <div>
-          <div class="card hidden" id="apps-card"><h2>People who want to ride <span id="n-apps" class="count"></span></h2><div id="apps"></div></div>
-          <div class="card"><h2>New orders <span id="n-new" class="count"></span></h2><div id="new-orders"></div></div>
-          <div class="card"><h2>Need a rider <span id="n-waiting" class="count"></span></h2><div id="waiting"></div></div>
-          <div class="card"><h2>Out with riders <span id="n-active" class="count"></span></h2><div id="active"></div></div>
-        </div>
-        <div>
-          <div class="card"><h2>Where everyone is</h2><div id="map" class="map tall"></div><div id="riders" class="muted"></div></div>
           <div class="card"><h2>Just delivered</h2><p class="muted">The photo each rider took at the door.</p><div id="delivered" class="proofs mt"></div></div>
           <div class="card"><h2>What's been happening</h2><div id="feed" class="feed"><p class="muted" id="feed-empty">Things will appear here as they happen while this page is open.</p></div></div>
         </div>
+      </div>
       </div>
       </div>
     </section>

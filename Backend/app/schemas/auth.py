@@ -30,6 +30,10 @@ class RefreshRequest(SQLModel):
     refresh_token: str
 
 
+class HandoffRedeem(SQLModel):
+    code: str = Field(max_length=100)
+
+
 class TokenPair(SQLModel):
     access_token: str
     refresh_token: str

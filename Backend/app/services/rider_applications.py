@@ -31,9 +31,11 @@ async def apply(session: AsyncSession, data: RiderSignup, documents: dict[Docume
     if not checked[DocumentKind.SELFIE][0].startswith("image/"):
         raise BadRequest("The face photo must be a photo, not a PDF", code="unsupported_document")
     if await user_repo.get_by_email(session, data.email):
-        raise Conflict("An account with this email already exists", code="email_taken")
+        raise Conflict("This email already has an account. Please use a different email for your rider account.",
+                       code="email_taken")
     if await user_repo.get_by_phone(session, data.phone):
-        raise Conflict("An account with this phone number already exists", code="phone_taken")
+        raise Conflict("This phone number already has an account. Please use a different number for your rider account.",
+                       code="phone_taken")
     user = User(email=data.email, phone=data.phone, full_name=data.full_name,
                 password_hash=hash_password(data.password), role=UserRole.RIDER, is_active=False,
                 google_sub=google_sub)

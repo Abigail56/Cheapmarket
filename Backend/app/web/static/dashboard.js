@@ -114,10 +114,31 @@ function showLogin(message) {
   if (message) toast(message, "error");
 }
 
-if (session.access) start(); else showLogin();
+// Signing in on the shop as an admin lands here with a one-time code
+(async () => {
+  const code = new URLSearchParams(location.search).get("handoff");
+  if (code) {
+    history.replaceState(null, "", location.pathname);
+    try {
+      session.tokens = await session.api("/auth/handoff/redeem", { method: "POST", json: { code } });
+    } catch { /* expired or already used: the sign-in form shows below */ }
+  }
+  if (session.access) start(); else showLogin();
+})();
+
+$("#rider-pending button").onclick = () => {
+  showView("deliveries");
+  $("#apps-card").scrollIntoView({ behavior: "smooth", block: "center" });
+};
+
+let todayLine = "";
+function showTodayLine() {
+  if (todayLine && !$("#view-deliveries").classList.contains("hidden")) $("#page-sub").textContent = todayLine;
+}
 
 async function load() {
   board = await session.api("/admin/deliveries/board");
+  session.api("/admin/dashboard").then((d) => { todayLine = `Today: ${d.orders_today} ${d.orders_today === 1 ? "order" : "orders"}, ${naira(d.revenue_today)} paid so far.`; showTodayLine(); }).catch(() => {});
   render();
   OrderAlarm.sync(board.new_orders || []);
   bell?.refresh().catch(() => {});
@@ -167,6 +188,9 @@ function render() {
   const apps = board.applications || [];
   $("#apps-card").classList.toggle("hidden", !apps.length);
   count("#n-apps", apps.length);
+  count("#nav-riders", apps.length);
+  $("#rider-pending").classList.toggle("hidden", !apps.length);
+  $("#rider-pending span").textContent = apps.length === 1 ? "1 person has applied and needs your approval." : `${apps.length} people have applied and need your approval.`;
   $("#apps").innerHTML = apps.map((a) => `
     <div class="item" data-app="${esc(a.id)}">
       <div class="row top"><strong>${esc(a.full_name)}</strong><span class="muted">${esc(ago(a.applied_at))}</span></div>
@@ -193,6 +217,7 @@ function render() {
     </div>`).join("");
   const newOrders = board.new_orders || [];
   count("#n-new", newOrders.length);
+  count("#nav-new", newOrders.length);
   count("#n-waiting", board.needs_rider.length);
   count("#n-active", board.active.length);
   stat("#s-new", newOrders.length, true);
@@ -215,7 +240,7 @@ function render() {
       ${o.failure_reason ? `<div class="banner bad">Last try failed: ${esc(o.failure_reason)}</div>` : ""}
       <div class="row" style="margin-top:8px">
         <select data-rider ${noRiders ? "disabled" : ""}>${noRiders ? "<option>No riders available</option>" : riderOptions()}</select>
-        <button class="small" data-assign ${noRiders ? "disabled" : ""}>Offer to rider</button>
+        <button class="small" data-assign ${noRiders ? "disabled" : ""}>Assign rider</button>
         ${o.failure_reason ? `<button class="small danger" data-cancel>Cancel order</button>` : ""}
       </div>
     </div>`).join("") : `<p class="muted">Every order has a rider.</p>`;

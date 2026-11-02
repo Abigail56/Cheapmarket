@@ -1,9 +1,9 @@
 // Makes the rider app installable and opens it instantly. API calls always go to the
 // network (deliveries must be live), only the app's own files are cached.
-const CACHE = "cmd-rider-v6";
+const CACHE = "cmd-rider-v8";
 const SHELL = ["/rider/", "/rider/rider.js", "/static/common.js", "/static/common.css",
                "/rider/icon.svg", "/rider/icon-192.png", "/rider/icon-512.png", "/rider/icon-maskable-512.png",
-               "/rider/manifest.webmanifest", "/static/rider-bg.jpg"];
+               "/rider/manifest.webmanifest", "/static/rider-bg.jpg", "/static/brand.css", "/rider/rider.css", "/static/logo.png"];
 
 self.addEventListener("install", (e) => {
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting()));

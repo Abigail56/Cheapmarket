@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 
 import { PageLoading } from "@/components/ui";
 import { useAuth } from "@/providers/auth";
@@ -14,7 +14,8 @@ const LINKS = [
 ] as const;
 
 export default function AccountLayout({ children }: { children: React.ReactNode }) {
-  const { user, ready, logout } = useAuth();
+  const { user, ready, logout, openStaffApp } = useAuth();
+  const [handoffFailed, setHandoffFailed] = useState(false);
   const router = useRouter();
   const pathname = usePathname();
 
@@ -22,7 +23,13 @@ export default function AccountLayout({ children }: { children: React.ReactNode 
     if (ready && !user) router.replace(`/login?next=${encodeURIComponent(pathname)}`);
   }, [ready, user, router, pathname]);
 
-  if (!ready || !user) return <PageLoading />;
+  // Staff belong on the dashboard or rider app (this also covers returning sessions)
+  const staffRole = user && user.role !== "customer" ? user.role : null;
+  useEffect(() => {
+    if (staffRole) openStaffApp(staffRole).catch(() => setHandoffFailed(true));
+  }, [staffRole, openStaffApp]);
+
+  if (!ready || !user || (staffRole && !handoffFailed)) return <PageLoading />;
 
   return (
     <div className="container-page py-8">

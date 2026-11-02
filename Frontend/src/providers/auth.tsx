@@ -3,6 +3,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 
 import { api, setSignedOutHandler } from "@/lib/api";
+import { API_URL } from "@/lib/config";
 import { tokenStore } from "@/lib/storage";
 import type { AuthResponse, TokenPair, User } from "@/lib/types";
 
@@ -13,6 +14,7 @@ interface AuthState {
   register: (data: { full_name: string; email: string; phone?: string; password: string }) => Promise<User>;
   googleSignIn: (idToken: string) => Promise<User>;
   logout: () => Promise<void>;
+  openStaffApp: (role: User["role"]) => Promise<void>;
   setUser: (u: User) => void;
 }
 
@@ -101,6 +103,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
         tokenStore.set(null);
         await changeUser(null);
+      },
+      // The dashboard and rider app are a separate site: pass staff over with a one-time code,
+      // and end this shop session so they aren't left signed in here as a customer.
+      openStaffApp: async (role) => {
+        const { code } = await api<{ code: string }>("/auth/handoff", { method: "POST" });
+        const tokens = tokenStore.get();
+        if (tokens) {
+          await api("/auth/logout", { method: "POST", body: { refresh_token: tokens.refresh } }).catch(() => {});
+        }
+        tokenStore.set(null);
+        // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- the dashboard is on the API's site
+        window.location.assign(`${API_URL}${role === "admin" ? "/dashboard" : "/rider/"}?handoff=${encodeURIComponent(code)}`);
       },
       setUser: (u) => setUserState(u),
     }),

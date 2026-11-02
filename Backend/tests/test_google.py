@@ -35,9 +35,9 @@ async def sign_in(client, token, create=True):
 
 
 async def test_config_exposes_client_id_only_when_set(client, monkeypatch):
-    assert (await client.get("/auth/config")).json() == {"google_client_id": CLIENT_ID}
+    assert (await client.get("/auth/config")).json()["google_client_id"] == CLIENT_ID
     monkeypatch.setattr(settings, "GOOGLE_CLIENT_ID", None)
-    assert (await client.get("/auth/config")).json() == {"google_client_id": None}
+    assert (await client.get("/auth/config")).json()["google_client_id"] is None
     r = await sign_in(client, google_token())
     assert r.status_code == 400 and r.json()["error"]["code"] == "google_disabled"
 

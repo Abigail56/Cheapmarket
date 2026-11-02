@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
 
+import { API_URL } from "@/lib/config";
 import { AuthShell, safeNext } from "@/components/auth-shell";
 import { GoogleButton } from "@/components/google-button";
 import { Alert, Field, PageLoading, Spinner } from "@/components/ui";
@@ -72,6 +73,11 @@ function RegisterForm() {
           <Link href="/login" className="link">
             Sign in
           </Link>
+          <br />
+          Want to deliver for us?{" "}
+          <a href={`${API_URL}/rider/?apply=1`} className="link">
+            Apply to ride with us
+          </a>
         </>
       }
     >

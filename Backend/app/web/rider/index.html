@@ -12,9 +12,13 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
         integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&display=swap">
   <link rel="stylesheet" href="/static/common.css">
+  <link rel="stylesheet" href="/static/brand.css">
+  <link rel="stylesheet" href="/rider/rider.css">
   <style>
+    .rider-logo { display: block; height: 36px; width: auto; }
+    @media (max-width: 480px) { .rider-logo { height: 28px; } header.bar h1 { gap: 6px; } }
     /* Sign-in and application screens only. Photo: "Boda Boda Kenya", CC0, https://commons.wikimedia.org/wiki/File:Boda_Boda_Kenya.jpg */
     body.public::before {
       content: ""; position: fixed; inset: 0; z-index: -1; background-color: #0b2a1c;
@@ -64,7 +68,7 @@
 </head>
 <body>
   <header class="bar">
-    <h1><span class="brand">Cheapmarket</span> <span class="sub">Rider</span> <span id="live" class="status-dot" title="Live connection"></span></h1>
+    <h1><img class="rider-logo" src="/static/logo.png" alt="Cheapmarket" width="662" height="144"> <span class="sub">Rider</span> <span id="live" class="status-dot" title="Live connection"></span></h1>
     <span id="sound"></span>
     <div id="bell" class="hidden"></div>
     <button id="logout" class="small quiet hidden" type="button">Sign out</button>
@@ -155,7 +159,7 @@
       </div>
       <div id="gps" class="muted" style="margin-bottom:8px"></div>
       <div id="jobs"></div>
-      <div id="empty" class="card empty hidden"><strong>No deliveries right now</strong>Keep this app open. You'll hear it the moment one comes in.</div>
+      <div id="empty" class="card empty hidden"><span class="empty-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="17" r="3"/><circle cx="18" cy="17" r="3"/><path d="M6 17l4-7h5l3 7M10 10L8.5 7H6M15 10l2-4h3"/></svg></span><strong>You're ready for deliveries</strong>Keep this app open. You'll hear it the moment one comes in.</div>
     </section>
   </main>
 

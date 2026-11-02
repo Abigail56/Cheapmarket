@@ -172,7 +172,20 @@ function showLogin(message) {
   if (message) toast(message, "error");
 }
 
-if (session.access) start(); else showLogin();
+// Signing in on the shop lands riders here with a one-time code; its "apply" links use ?apply=1
+(async () => {
+  const params = new URLSearchParams(location.search);
+  const code = params.get("handoff");
+  if (location.search) history.replaceState(null, "", location.pathname);
+  if (code) {
+    try {
+      session.tokens = await session.api("/auth/handoff/redeem", { method: "POST", json: { code } });
+    } catch { /* expired or already used: the sign-in form shows below */ }
+  }
+  if (session.access) { start(); return; }
+  showLogin();
+  if (params.has("apply")) $("#show-apply").click();
+})();
 
 // ---------------------------------------------------------------- live events
 function onEvent(type, data) {
@@ -284,16 +297,20 @@ function card(job) {
     ? `<div class="banner warn">${esc(firstName(job))} changed the address. Please check it and confirm again.</div>` : "";
   return `
   <article class="card" id="job-${job.id}" data-order="${esc(job.order_number)}">
-    <div class="between"><h2>${esc(job.order_number)}</h2><span class="chip ${esc(job.status)}">${esc(STATUS_TEXT[job.status] || job.status)}</span></div>
+    <div class="between job-head"><span class="job-no">${esc(job.order_number)}</span><span class="chip ${esc(job.status)}">${esc(STATUS_TEXT[job.status] || job.status)}</span></div>
     ${progress(job)}
     ${job.status === "assigned" ? `<p class="countdown offer-time" data-deadline="${esc(job.accept_deadline)}"></p>` : ""}
     ${cash}${changed}
-    <p class="who">${esc(job.customer_name)}</p>
-    ${job.customer_phone ? `<p class="place"><a href="tel:${esc(job.customer_phone)}">Call ${esc(job.customer_phone)}</a></p>` : ""}
-    <p class="place">${esc(job.delivery_address)}</p>
-    ${job.landmark ? `<p class="muted place">Landmark: ${esc(job.landmark)}</p>` : ""}
-    ${job.notes ? `<p class="muted place">Note: ${esc(job.notes)}</p>` : ""}
-    <p class="muted">${items} · ${naira(job.total)}</p>
+    <div class="job-customer">
+      <div class="job-who">
+        <h2>${esc(job.customer_name)}</h2>
+        <p class="place job-address"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s7-6.2 7-11.5A7 7 0 0 0 5 9.5C5 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.4"/></svg><span>${esc(job.delivery_address)}</span></p>
+        ${job.landmark ? `<p class="muted place">Landmark: ${esc(job.landmark)}</p>` : ""}
+        ${job.notes ? `<p class="muted place">Note: ${esc(job.notes)}</p>` : ""}
+      </div>
+      ${job.customer_phone ? `<a class="job-call" href="tel:${esc(job.customer_phone)}" aria-label="Call ${esc(job.customer_name)} on ${esc(job.customer_phone)}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2z"/></svg>Call</a>` : ""}
+    </div>
+    <div class="job-items"><span>${items}</span><strong>${naira(job.total)}</strong></div>
     ${steps(job)}
   </article>`;
 }
@@ -311,7 +328,7 @@ function steps(job) {
   const who = esc(firstName(job));
   switch (job.status) {
     case "assigned":
-      return `<div class="row mt"><button data-act="accept">Accept delivery</button><button class="secondary" data-act="decline">I can't take it</button></div>`;
+      return `<div class="job-offer"><button class="full" data-act="accept">Accept delivery</button><button class="quiet full" data-act="decline">I can't take it</button></div>`;
     case "accepted":
       return `
         ${stepBlock(1, job.address_confirmed, "Check the address", `

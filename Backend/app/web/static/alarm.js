@@ -4,7 +4,7 @@
 "use strict";
 
 const OrderAlarm = (() => {
-  const RING_EVERY_MS = 5000;  // the "alert" siren lasts about 3.5 seconds
+  const RING_EVERY_MS = 8000;  // a soft chime, repeated until someone acts
   const STORE_KEY = "cmd.alarm.stopped";
   const pending = new Map();   // order number -> { order_number, total, payment_method }
   let timer = null;
@@ -32,8 +32,8 @@ const OrderAlarm = (() => {
 
   function ringing() {
     if (pending.size && !timer) {
-      Sound.play("alert");
-      timer = setInterval(() => Sound.play("alert"), RING_EVERY_MS);
+      Sound.play("chime");
+      timer = setInterval(() => Sound.play("chime"), RING_EVERY_MS);
     } else if (!pending.size && timer) {
       clearInterval(timer);
       timer = null;

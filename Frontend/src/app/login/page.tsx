@@ -7,6 +7,7 @@ import { Suspense, useState } from "react";
 import { AuthShell, safeNext } from "@/components/auth-shell";
 import { GoogleButton } from "@/components/google-button";
 import { Alert, Field, PageLoading, Spinner } from "@/components/ui";
+import type { User } from "@/lib/types";
 import { useAuth } from "@/providers/auth";
 import { PasswordInput } from "@/components/password-input";
 
@@ -22,17 +23,21 @@ function LoginForm() {
   const router = useRouter();
   const search = useSearchParams();
   const next = safeNext(search.get("next"));
-  const { login, googleSignIn } = useAuth();
+  const { login, googleSignIn, openStaffApp } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
 
-  async function run(fn: () => Promise<unknown>) {
+  async function run(fn: () => Promise<User>) {
     setBusy(true);
     setError("");
     try {
-      await fn();
+      const me = await fn();
+      if (me.role !== "customer") {
+        await openStaffApp(me.role);  // leaves this site, so the button stays busy
+        return;
+      }
       router.replace(next);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Couldn't sign you in");

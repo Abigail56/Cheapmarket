@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-import { SITE_NAME, SITE_TAGLINE, SUPPORT_EMAIL, SUPPORT_PHONE } from "@/lib/config";
+import { API_URL, SITE_NAME, SITE_TAGLINE, SUPPORT_EMAIL, SUPPORT_PHONE } from "@/lib/config";
 
 import { Logo } from "./ui";
 
@@ -65,6 +65,9 @@ export function Footer() {
       <div className="border-t border-white/15">
         <div className="container-page flex flex-wrap justify-between gap-2 py-5 text-xs text-white/60">
           <p>© {SITE_NAME}. All prices are in Naira (₦).</p>
+          <a href={`${API_URL}/rider/?apply=1`} className="hover:text-white">
+            Become a rider
+          </a>
         </div>
       </div>
     </footer>
