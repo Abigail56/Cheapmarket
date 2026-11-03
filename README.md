@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/Abigail56/cheapmarketdeal-api/actions/workflows/ci.yml"><img src="https://github.com/Abigail56/cheapmarketdeal-api/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="https://github.com/Abigail56/Cheapmarket/actions/workflows/ci.yml"><img src="https://github.com/Abigail56/Cheapmarket/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <img src="https://img.shields.io/badge/python-3.12-3776AB?logo=python&logoColor=white" alt="Python 3.12">
   <img src="https://img.shields.io/badge/FastAPI-009688?logo=fastapi&logoColor=white" alt="FastAPI">
   <img src="https://img.shields.io/badge/Next.js-16-000000?logo=nextdotjs&logoColor=white" alt="Next.js 16">
@@ -187,8 +187,8 @@ Production runs from `Backend/docker-compose.prod.yml`: API, worker, shop, Postg
 
 ```bash
 # On the server, with DNS A records for both domains (e.g. api.example.com and example.com)
-git clone https://github.com/Abigail56/cheapmarketdeal-api.git
-cd cheapmarketdeal-api/Backend
+git clone https://github.com/Abigail56/Cheapmarket.git
+cd Cheapmarket/Backend
 cp .env.production.example .env       # fill in every REQUIRED value
 mkdir -p backups
 docker compose -f docker-compose.prod.yml up -d --build

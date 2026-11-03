@@ -158,7 +158,7 @@ The `backup` service writes `./backups/<db>_<timestamp>.dump` every `BACKUP_INTE
 ```bash
 # on the server, with DNS A records for BOTH domains (e.g. api.yourdomain.com and
 # yourdomain.com) pointing at it
-git clone <this repo> && cd cheapmarketdeal-api/Backend   # the shop is built from ../Frontend
+git clone <this repo> && cd Cheapmarket/Backend   # the shop is built from ../Frontend
 cp .env.production.example .env        # fill in every value marked REQUIRED
 mkdir -p backups
 docker compose -f docker-compose.prod.yml up -d --build
